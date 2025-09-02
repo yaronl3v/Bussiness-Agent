@@ -1,0 +1,46 @@
+{
+  "name": "businessagent-server",
+  "version": "1.0.0",
+  "description": "Business Agent Server - Express API with PostgreSQL",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+  },
+  "dependencies": {
+    "@dqbd/tiktoken": "^1.0.22",
+    "bcrypt": "^6.0.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "html-to-text": "^9.0.5",
+    "joi": "^18.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "mammoth": "^1.10.0",
+    "mime-types": "^3.0.1",
+    "multer": "^2.0.2",
+    "openai": "^5.16.0",
+    "pdf-parse": "^1.1.1",
+    "pg": "^8.11.3",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.35.2",
+    "string-strip-html": "^13.4.13"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2",
+    "sequelize-cli": "^6.6.3"
+  },
+  "keywords": [
+    "express",
+    "postgresql",
+    "sequelize",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT"
+}

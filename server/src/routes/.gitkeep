@@ -1,0 +1,10 @@
+# Routes will be created here
+# auth_routes.js
+# orgs_routes.js
+# agents_routes.js
+# documents_routes.js
+# search_routes.js
+# conversations_routes.js
+# leads_routes.js
+# vendors_routes.js
+# webhooks_routes.js
