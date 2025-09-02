@@ -34,7 +34,8 @@ export class WebhooksController {
       const bot = new BotOrchestrator({ userId: null, agentId });
       const response = await bot.chat({ messageText: text, channel: 'whatsapp', context: { conversationId: convo.id } });
 
-      await ConversationService.sendMessage({ conversationId: convo.id, role: 'assistant', content: response.uiText || '' });
+      const assistant = await ConversationService.sendMessage({ conversationId: convo.id, role: 'assistant', content: response.uiText || '' });
+      if (response.citations) assistant.citations_jsonb = response.citations;
 
       // send outbound reply stub
       await WhatsAppService.sendText({ to: from, text: response.uiText || '' });

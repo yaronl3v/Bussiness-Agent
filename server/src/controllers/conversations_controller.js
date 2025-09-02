@@ -26,7 +26,11 @@ export class ConversationsController {
       const bot = new BotOrchestrator({ userId: req.user.id, agentId });
       const response = await bot.chat({ messageText: value.content, channel: 'inapp', context: { conversationId: id } });
       const assistantMsg = await ConversationService.sendMessage({ conversationId: id, role: 'assistant', content: response.uiText || '' });
-      return res.status(201).json({ user: userMsg, assistant: assistantMsg });
+      if (response.citations) {
+        // quick update to persist citations
+        assistantMsg.citations_jsonb = response.citations;
+      }
+      return res.status(201).json({ user: userMsg, assistant: assistantMsg, citations: response.citations || [] });
     } catch (err) { next(err); }
   }
 }

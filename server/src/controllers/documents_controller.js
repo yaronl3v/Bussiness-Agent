@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { Document } from '../models/index.js';
+import { Document, Chunk, sequelize } from '../models/index.js';
 import { extractTextFromFile, normalizeText } from '../utils/text_extraction.js';
 
 const createSchema = Joi.object({
@@ -46,8 +46,16 @@ export class DocumentsController {
     try {
       if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
       const { docId } = req.params;
-      await Document.destroy({ where: { id: docId } });
-      return res.status(204).send();
+      const t = await sequelize.transaction();
+      try {
+        await Chunk.destroy({ where: { document_id: docId }, transaction: t });
+        await Document.destroy({ where: { id: docId }, transaction: t });
+        await t.commit();
+        return res.status(204).send();
+      } catch (err) {
+        await t.rollback();
+        throw err;
+      }
     } catch (err) { next(err); }
   }
 }

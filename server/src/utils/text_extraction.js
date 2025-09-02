@@ -1,6 +1,5 @@
 import fs from 'fs/promises';
 import path from 'path';
-import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
 import { htmlToText } from 'html-to-text';
 import { stripHtml } from 'string-strip-html';
@@ -9,6 +8,8 @@ export async function extractTextFromFile(filePath, mime) {
   const ext = path.extname(filePath).toLowerCase();
   if (mime === 'application/pdf' || ext === '.pdf') {
     const data = await fs.readFile(filePath);
+    // Lazy import function export to avoid CLI side-effects in package index
+    const { default: pdfParse } = await import('pdf-parse/lib/pdf-parse.js');
     const res = await pdfParse(data);
     return res.text || '';
   }

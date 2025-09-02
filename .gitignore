@@ -1,6 +1,6 @@
 # Dependencies
-/node_modules
-/.pnp
+node_modules/
+.pnp
 .pnp.js
 
 # Testing
@@ -8,6 +8,9 @@
 
 # Production
 /build
+# Vite
+client/dist
+client/dist-ssr
 
 # Misc
 .DS_Store

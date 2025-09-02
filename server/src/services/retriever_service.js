@@ -98,6 +98,10 @@ export class RetrieverService {
 
     return ordered.length > 0 ? ordered : merged;
   }
+
+  static toCitations(passages) {
+    return passages.map((p, idx) => ({ chunk_id: p.id, similarity: p.similarity, label: idx + 1 }));
+  }
 }
 
 export default RetrieverService;
