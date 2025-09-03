@@ -299,15 +299,15 @@ Internally, it coordinates `retriever_service`, `llm_service`, and `intake_servi
 - Always run DDL and index changes using:
 
 ```bash
-node src/tools/execute-sql.js "<YOUR SQL HERE>"
+node server/src/tools/execute-sql.js "<YOUR SQL HERE>"
 ```
 
 Examples:
 
 ```bash
-node src/tools/execute-sql.js "CREATE EXTENSION IF NOT EXISTS vector;";
-node src/tools/execute-sql.js "ALTER TABLE chunks ADD COLUMN IF NOT EXISTS embedding vector(1536);";
-node src/tools/execute-sql.js "CREATE INDEX IF NOT EXISTS chunks_embedding_ivfflat ON chunks USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);";
+node server/src/tools/execute-sql.js "CREATE EXTENSION IF NOT EXISTS vector;";
+node server/src/tools/execute-sql.js "ALTER TABLE chunks ADD COLUMN IF NOT EXISTS embedding vector(1536);";
+node server/src/tools/execute-sql.js "CREATE INDEX IF NOT EXISTS chunks_embedding_ivfflat ON chunks USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);";
 ```
 
 ## Implementation Steps (Order)

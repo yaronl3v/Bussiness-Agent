@@ -1,0 +1,21 @@
+ - welcome msg  - 
+Right now it used just for ui in front end, in the beinging of chat. Lets make some changes
+1. Lets replace its name to intro info. 
+2. Our funnel is such that first user interacts with bot then bot answers. so no need for auto msg on start.
+3. Instead the intro, is added to the agnet prompt, this tells the agent a bit about itself.
+Example, user may fill in "You are a landscape advisor names Uri". Then agent can use this info, when presenting itself however it see fit.
+
+
+******************
+
+
+
+-update server.md accordingly.
+- Add comments what each part do, didnt get the enable retrival enabled -> should be if user added docs then we use it , if not not.
+-make sure you removed all old stuff that we dont need and were used, and that new approach is nicely organized to allow editing and further enhancemtns.
+
+
+
+- conversation not connected at All
+- complete / redo whatsup with whatsup auth connect
+- front invite - see what we have on backend

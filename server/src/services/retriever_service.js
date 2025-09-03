@@ -21,6 +21,9 @@ function reciprocalRankFusion(lists, topK = 10) {
 
 export class RetrieverService {
   static async searchVector({ agentId, queryEmbedding, topN = 200 }) {
+    const vectorParam = Array.isArray(queryEmbedding)
+      ? `[${queryEmbedding.join(',')}]`
+      : String(queryEmbedding);
     const [rows] = await sequelize.query(
       `SELECT id, document_id, content, position_jsonb,
               1 - (embedding <=> CAST($1 AS vector)) AS similarity
@@ -28,7 +31,7 @@ export class RetrieverService {
        WHERE agent_id = $2
        ORDER BY embedding <-> CAST($1 AS vector)
        LIMIT $3;`,
-      { bind: [queryEmbedding, agentId, topN] }
+      { bind: [vectorParam, agentId, topN] }
     );
     return rows;
   }

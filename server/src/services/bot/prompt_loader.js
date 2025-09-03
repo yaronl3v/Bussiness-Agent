@@ -1,8 +1,10 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 export async function loadPrompt(fileName, variables = {}, locale = 'en') {
-  const baseDir = path.dirname(new URL(import.meta.url).pathname);
+  const __filename = fileURLToPath(import.meta.url);
+  const baseDir = path.dirname(__filename);
   const localePath = path.join(baseDir, 'prompts', locale, fileName);
   const defaultPath = path.join(baseDir, 'prompts', fileName);
   let raw = '';

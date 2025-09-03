@@ -3,8 +3,10 @@ import { AuthService } from '../services/auth_service.js';
 
 const registerSchema = Joi.object({
   email: Joi.string().email().required(),
-  password: Joi.string().min(8).required()
-});
+  password: Joi.string().min(8).required(),
+  organizationName: Joi.string().min(1).max(255).optional(),
+  inviteToken: Joi.string().optional()
+}).unknown(true);
 
 const loginSchema = Joi.object({
   email: Joi.string().email().required(),

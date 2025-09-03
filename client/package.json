@@ -1,5 +1,5 @@
 {
-  "name": "client",
+  "name": "wisechat-client",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -13,6 +13,7 @@
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^5.2.1",
     "@tailwindcss/forms": "^0.5.10",
+    "@tailwindcss/postcss": "^4.1.12",
     "autoprefixer": "^10.4.21",
     "axios": "^1.11.0",
     "clsx": "^2.1.1",

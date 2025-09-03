@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { authService } from './services/auth.js';
+import { authService } from './services/index.js';
+import { useToast } from './hooks/useToast.js';
+import { ToastContainer } from './components/ui/Toast.jsx';
 import Login from './pages/auth/Login.jsx';
 import Register from './pages/auth/Register.jsx';
 import AgentsList from './pages/agents/AgentsList.jsx';
@@ -22,6 +24,8 @@ function PublicRoute({ children }) {
 }
 
 function App() {
+  const { toasts, removeToast } = useToast();
+
   return (
     <Router>
       <div className="min-h-screen bg-gray-50">
@@ -73,6 +77,9 @@ function App() {
           {/* Default redirect */}
           <Route path="/" element={<Navigate to="/agents" />} />
         </Routes>
+        
+        {/* Toast Container */}
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
       </div>
     </Router>
   );

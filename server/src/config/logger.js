@@ -7,7 +7,12 @@ export const logger = {
   },
   
   error: (message, error = null, meta = {}) => {
-    console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, { error: error?.message || error, stack: error?.stack, ...meta });
+    if (error) {
+      // Pass the error object so Node prints the full stack
+      console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, error, meta);
+    } else {
+      console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, meta);
+    }
   },
   
   warn: (message, meta = {}) => {

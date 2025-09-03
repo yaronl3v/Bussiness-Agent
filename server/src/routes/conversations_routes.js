@@ -4,6 +4,7 @@ import { ConversationsController } from '../controllers/conversations_controller
 
 const router = Router({ mergeParams: true });
 
+router.post('/agents/:id/conversations', requireAuth, ConversationsController.createForAgent);
 router.get('/:id/messages', requireAuth, ConversationsController.listMessages);
 router.post('/:id/messages', requireAuth, ConversationsController.sendMessage);
 

@@ -1,3 +1,1 @@
-You can type "back" to revisit the previous question or "skip" to skip the current one.
-
-
+You can type "back" to revisit the previous question or "skip" to skip the current one

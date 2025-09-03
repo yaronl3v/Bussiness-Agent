@@ -2,10 +2,12 @@ import EmbeddingService from '../embedding_service.js';
 import RetrieverService from '../retriever_service.js';
 import IntakeService from '../intake_service.js';
 import LlmService from '../llm_service.js';
-import loadPrompt from './prompt_loader.js';
-import { Agent, Lead } from '../../models/index.js';
+import { Agent, Lead, Document } from '../../models/index.js';
 import ConversationService from '../conversation_service.js';
 import VendorService from '../vendor_service.js';
+import { buildSinglePrompt } from './prompt_builder.js';
+import { extractFirstJson } from '../../utils/json_parse.js';
+import llmconfig from '../../config/llmconfig.js';
 
 export class BotOrchestrator {
   constructor({ userId, agentId }) {
@@ -15,128 +17,163 @@ export class BotOrchestrator {
   }
 
   async chat({ messageText, channel, context }) {
-    // Load agent config
-    const agent = await Agent.findByPk(this.agentId);
-    const leadSchema = agent?.dataValues?.lead_form_schema_jsonb || {};
-    const dynSchema = agent?.dataValues?.dynamic_info_schema_jsonb || {};
-
-    // Read conversation meta
     const conversationId = context?.conversationId;
+    const agent = await Agent.findByPk(this.agentId);
+    const baseLeadSchema = normalizeIntakeSchema(agent?.dataValues?.lead_form_schema_jsonb || {});
+    const baseDynSchema = normalizeIntakeSchema(agent?.dataValues?.dynamic_info_schema_jsonb || {});
+
+    // Read + initialize conversation meta with schema states (no rigid phases)
     const convo = conversationId ? await ConversationService.getById(conversationId) : null;
-    const meta = convo?.meta_jsonb || { phase: 'intake', stack: [], lead_schema: leadSchema, dyn_schema: dynSchema };
+    const meta = convo?.meta_jsonb || {};
+    const currentLead = normalizeIntakeSchema(meta.lead_schema || baseLeadSchema);
+    const currentDyn = normalizeIntakeSchema(meta.dyn_schema || baseDynSchema);
 
-    const isBack = /^\s*back\s*$/i.test(messageText);
-    const isSkip = /^\s*skip\s*$/i.test(messageText);
+    // Pull history (capped)
+    const historyTurns = Math.max(0, Number(llmconfig.history?.turns || 8));
+    const history = conversationId ? await ConversationService.getRecentMessages(conversationId, historyTurns * 2) : [];
 
-    // Decide phase
-    const phase = meta.phase || 'intake';
+    // Handle simple navigation commands
+    const isBack = /^\s*back\s*$/i.test(messageText || '');
 
-    if (phase === 'intake') {
-      const currentLead = meta.lead_schema || leadSchema;
-      const updatedLead = IntakeService.merge(currentLead, []);
-      let nextQuestion = findNextRequiredQuestion(updatedLead);
-      if (isBack && meta.stack?.length) {
-        const lastId = meta.stack.pop();
-        markQuestionUndone(updatedLead, lastId);
-        nextQuestion = getQuestionById(updatedLead, lastId) || nextQuestion;
-      }
-      if (nextQuestion) {
-        if (isSkip) {
-          markQuestionDone(updatedLead, nextQuestion.id);
-          await ConversationService.updateMeta(conversationId, { ...meta, lead_schema: updatedLead, stack: meta.stack });
-          const following = findNextRequiredQuestion(updatedLead);
-          return { uiText: following ? `${following.label}` : 'Thanks. Intake complete. Proceeding...', proposedUpdates: [], nextAction: following ? 'ask' : 'answer', nextQuestionId: following?.id };
+    // Decide if retrieval is needed (only if agent has docs)
+    let passages = [];
+    let citations = [];
+    if (llmconfig.retrieval.enabledByDefault) {
+      const docsCount = await Document.count({ where: { agent_id: this.agentId } });
+      if (docsCount > 0) {
+        try {
+          const embedSvc = new EmbeddingService();
+          const [qEmbedding] = await embedSvc.embedTexts([messageText]);
+          const hybrid = await RetrieverService.searchHybrid({
+            agentId: this.agentId,
+            question: { text: messageText, embedding: qEmbedding },
+            topN: llmconfig.retrieval.topN,
+            topK: llmconfig.retrieval.topK,
+            useFTS: llmconfig.retrieval.useFTS,
+            useTrigram: llmconfig.retrieval.useTrigram,
+            useRerank: llmconfig.retrieval.useRerank
+          });
+          passages = Array.isArray(hybrid) ? hybrid : [];
+          citations = RetrieverService.toCitations(passages);
+        } catch {
+          // Fail open: continue without passages
+          passages = [];
+          citations = [];
         }
-        let uiText = `Please provide: ${nextQuestion.label}`;
-        if (this.llm.isEnabled()) {
-          const sys = await loadPrompt('intake_system.txt', { agentName: agent?.dataValues?.name || '' , businessName: agent?.dataValues?.name || ''});
-          const usr = `Question: ${nextQuestion.label}\nUser: ${messageText}\nReturn only the value if detected.`;
-          const { text } = await this.llm.chat({ system: sys, user: usr });
-          const value = (text || '').trim();
-          const merged = IntakeService.merge(updatedLead, value ? [{ questionId: nextQuestion.id, value }] : []);
-          if (value) meta.stack = [...(meta.stack || []), nextQuestion.id];
-          const following = findNextRequiredQuestion(merged);
-          await ConversationService.updateMeta(conversationId, { ...meta, phase: following ? 'intake' : 'dyn', lead_schema: merged, stack: meta.stack });
-          return { uiText: following ? `Thanks. ${following.label}` : 'Thanks. Intake complete. Proceeding...', proposedUpdates: [], nextAction: following ? 'ask' : 'answer', nextQuestionId: following?.id };
-        }
-        await ConversationService.updateMeta(conversationId, { ...meta, phase: 'intake', lead_schema: updatedLead, stack: meta.stack });
-        return { uiText, proposedUpdates: [], nextAction: 'ask', nextQuestionId: nextQuestion.id };
       }
-      // Lead intake complete → ensure lead then move to dynamic info
-      await ensureLeadExists({ agentId: this.agentId, conversationId });
-      await ConversationService.updateMeta(conversationId, { ...meta, phase: 'dyn' });
-      return { uiText: 'Thanks. Let’s gather a few more details.', nextAction: 'ask' };
     }
 
-    if (meta.phase === 'dyn') {
-      const currentDyn = meta.dyn_schema || dynSchema;
-      const updatedDyn = IntakeService.merge(currentDyn, []);
-      let nextQuestion = findNextRequiredQuestion(updatedDyn);
-      if (isBack && meta.stack?.length) {
-        const lastId = meta.stack.pop();
-        markQuestionUndone(updatedDyn, lastId);
-        nextQuestion = getQuestionById(updatedDyn, lastId) || nextQuestion;
-      }
-      if (nextQuestion) {
-        if (isSkip) {
-          markQuestionDone(updatedDyn, nextQuestion.id);
-          await ConversationService.updateMeta(conversationId, { ...meta, dyn_schema: updatedDyn, stack: meta.stack });
-          const following = findNextRequiredQuestion(updatedDyn);
-          return { uiText: following ? `${following.label}` : 'All set. I can now answer questions.', proposedUpdates: [], nextAction: following ? 'ask' : 'answer', nextQuestionId: following?.id };
-        }
-        if (this.llm.isEnabled()) {
-          const sys = await loadPrompt('intake_system.txt', { agentName: agent?.dataValues?.name || '' , businessName: agent?.dataValues?.name || ''});
-          const usr = `Question: ${nextQuestion.label}\nUser: ${messageText}\nReturn only the value if detected.`;
-          const { text } = await this.llm.chat({ system: sys, user: usr });
-          const value = (text || '').trim();
-          const merged = IntakeService.merge(updatedDyn, value ? [{ questionId: nextQuestion.id, value }] : []);
-          if (value) meta.stack = [...(meta.stack || []), nextQuestion.id];
-          const following = findNextRequiredQuestion(merged);
-          await ConversationService.updateMeta(conversationId, { ...meta, phase: following ? 'dyn' : 'qna', dyn_schema: merged, stack: meta.stack });
-          return { uiText: following ? `Thanks. ${following.label}` : 'Thanks. I can answer with more context now.', proposedUpdates: [], nextAction: following ? 'ask' : 'answer', nextQuestionId: following?.id };
-        }
-        await ConversationService.updateMeta(conversationId, { ...meta, phase: 'dyn', dyn_schema: updatedDyn, stack: meta.stack });
-        return { uiText: `Please provide: ${nextQuestion.label}`, proposedUpdates: [], nextAction: 'ask', nextQuestionId: nextQuestion.id };
-      }
-      // Dynamic info complete → proceed to Q&A
-      await ConversationService.updateMeta(conversationId, { ...meta, phase: 'qna' });
-    }
+    // Build a single big prompt with sections
+    const { promptText } = await buildSinglePrompt({
+      agent,
+      history,
+      userMessage: messageText,
+      leadSchema: currentLead,
+      dynSchema: currentDyn,
+      passages,
+      includeBackHint: Boolean(llmconfig.prompt?.includeBackHint)
+    });
 
-    // Q&A with retrieval
-    const embedder = new EmbeddingService();
-    const [queryEmbedding] = await embedder.embedTexts([messageText]);
-    const passages = await RetrieverService.searchHybrid({ agentId: this.agentId, question: { text: messageText, embedding: queryEmbedding }, topN: 200, topK: 10, useFTS: true, useTrigram: true, useRerank: true });
-    let answer = '';
+    let assistant = '';
+    let leadUpdates = [];
+    let dynUpdates = [];
+
     if (this.llm.isEnabled()) {
-      const contextText = passages.map((p, i) => `[${i+1}] ${p.content}`).join('\n');
-      const sys = await loadPrompt('qna_system.txt', { agentName: agent?.dataValues?.name || '' });
-      const usr = `QUESTION: ${messageText}\nCONTEXT:\n${contextText}`;
-      const { text } = await this.llm.chat({ system: sys, user: usr, temperature: 0.1 });
-      answer = text || '';
-    } else {
-      answer = `Found ${passages.length} relevant passages.`;
+      const { text } = await this.llm.makeLlmCall({
+        system: '',
+        user: promptText,
+        model: llmconfig.model,
+        temperature: llmconfig.temperature,
+        promptName: 'single_prompt'
+      });
+      const json = extractFirstJson(text || '') || {};
+      assistant = typeof json.assistant === 'string' && json.assistant.trim() ? json.assistant.trim() : '';
+      if (Array.isArray(json.lead_updates)) leadUpdates = json.lead_updates;
+      if (Array.isArray(json.dyn_updates)) dynUpdates = json.dyn_updates;
     }
-    const citations = RetrieverService.toCitations(passages);
-    // Optional vendor suggestion (safe if configs empty)
-    const lead = await Lead.findOne({ where: { agent_id: this.agentId, conversation_id: conversationId } });
-    const suggestion = await VendorService.selectVendor(this.agentId, lead?.lead_jsonb || {});
+
+    // Support "back": undo the last answered question
+    const stack = Array.isArray(meta.stack) ? [...meta.stack] : [];
+    if (isBack && stack.length > 0) {
+      const lastId = stack.pop();
+      clearQuestion(currentLead, lastId);
+      clearQuestion(currentDyn, lastId);
+    }
+
+    // Merge updates into schema state
+    const mergedLead = IntakeService.merge(currentLead, leadUpdates);
+    const mergedDyn = IntakeService.merge(currentDyn, dynUpdates);
+
+    // Push updated question IDs onto stack (to enable back)
+    for (const u of leadUpdates) if (u?.questionId) stack.push(u.questionId);
+    for (const u of dynUpdates) if (u?.questionId) stack.push(u.questionId);
+
+    // Persist updated schema states on conversation meta
+    if (conversationId) {
+      const nextMeta = { ...meta, lead_schema: mergedLead, dyn_schema: mergedDyn, stack };
+      await ConversationService.updateMeta(conversationId, nextMeta);
+    }
+
+    // Ensure a Lead record exists if any lead updates were detected
+    if (conversationId && (leadUpdates?.length || 0) > 0) {
+      await ensureLeadExists({ agentId: this.agentId, conversationId });
+    }
+
+    // Optional vendor suggestion (unchanged behavior)
     let suggestionText = '';
-    if (suggestion) {
-      const vendorName = suggestion.vendor_jsonb?.name || 'a specialist';
-      suggestionText = '\n\n' + (await loadPrompt('vendor_suggest.txt', { vendorName }));
+    try {
+      const lead = conversationId ? await Lead.findOne({ where: { agent_id: this.agentId, conversation_id: conversationId } }) : null;
+      const suggestion = await VendorService.selectVendor(this.agentId, lead?.lead_jsonb || {});
+      if (suggestion) {
+        const vendorName = suggestion.vendor_jsonb?.name || 'a specialist';
+        suggestionText = `\n\nWould you like me to connect you with our vendor: ${vendorName}?`;
+      }
+    } catch {
+      // ignore vendor errors
     }
-    return { uiText: `${answer}${suggestionText}`, proposedUpdates: [], nextAction: 'answer', citations };
+
+    // Fallbacks when LLM disabled or produced empty content
+    if (!assistant) {
+      if (passages.length > 0) {
+        assistant = `I found ${passages.length} relevant passages. What would you like to know about them?`;
+      } else {
+        assistant = agent?.dataValues?.welcome_message || 'Hi! I can help with your questions. You can upload documents to improve my answers.';
+      }
+    }
+
+    return {
+      uiText: `${assistant}${suggestionText}`,
+      proposedUpdates: [], // kept for backward-compat with UI; updates are applied server-side
+      nextAction: 'answer',
+      citations
+    };
   }
 }
 
-function findNextRequiredQuestion(schema) {
-  const sections = schema?.sections || [];
-  for (const s of sections) {
-    for (const q of s.questions || []) {
-      if (q.required && !q.isDone) return q;
+function normalizeIntakeSchema(schema) {
+  if (!schema) return { sections: [] };
+  if (typeof schema === 'object' && Array.isArray(schema.sections)) return schema;
+  if (Array.isArray(schema)) {
+    const looksLikeQuestions = schema.every(q => q && typeof q === 'object' && (q.label || q.id));
+    if (looksLikeQuestions) {
+      return { sections: [{ id: 'default', title: 'Details', questions: schema }] };
     }
   }
-  return null;
+  return { sections: [] };
+}
+
+function clearQuestion(schema, questionId) {
+  if (!schema || !questionId) return;
+  for (const s of schema.sections || []) {
+    for (const q of s.questions || []) {
+      if (q.id === questionId) {
+        delete q.answer;
+        q.isDone = false;
+        q.collected = false;
+        return;
+      }
+    }
+  }
 }
 
 async function ensureLeadExists({ agentId, conversationId }) {

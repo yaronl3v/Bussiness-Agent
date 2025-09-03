@@ -16,6 +16,15 @@ export class ConversationService {
     return messages.map(m => m.dataValues);
   }
 
+  static async getRecentMessages(conversationId, limit = 10) {
+    const messages = await Message.findAll({
+      where: { conversation_id: conversationId },
+      order: [['created_at', 'DESC']],
+      limit
+    });
+    return messages.reverse().map(m => m.dataValues);
+  }
+
   static async createOrGet({ agentId, clientId, channel = 'inapp' }) {
     let convo = await Conversation.findOne({ where: { agent_id: agentId, client_id: clientId } });
     if (convo) return convo.dataValues;

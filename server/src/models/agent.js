@@ -35,6 +35,10 @@ Agent.init(
       type: DataTypes.TEXT,
       allowNull: true
     },
+    lead_schema_natural_text: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
     lead_form_schema_jsonb: {
       type: DataTypes.JSONB,
       allowNull: false,
