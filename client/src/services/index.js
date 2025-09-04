@@ -133,6 +133,7 @@ export const agentsService = {
     if (data.dynamicInfoSchemaNaturalText !== undefined) serverData.dynamic_info_schema_natural_text = data.dynamicInfoSchemaNaturalText;
     if (data.postCollectionInformationText !== undefined) serverData.post_collection_information_text = data.postCollectionInformationText;
     if (data.modules !== undefined) serverData.modules_jsonb = data.modules;
+    if (data.chatFlow !== undefined) serverData.chat_flow_jsonb = data.chatFlow;
     
     return await apiClient.patch(ENDPOINTS.AGENTS.UPDATE(orgId, agentId), serverData);
   },

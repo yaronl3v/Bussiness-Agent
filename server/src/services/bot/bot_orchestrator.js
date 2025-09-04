@@ -22,11 +22,12 @@ export class BotOrchestrator {
     const baseLeadSchema = normalizeIntakeSchema(agent?.dataValues?.lead_form_schema_jsonb || {});
     const baseDynSchema = normalizeIntakeSchema(agent?.dataValues?.dynamic_info_schema_jsonb || {});
 
-    // Read + initialize conversation meta with schema states (no rigid phases)
+    // Read + initialize conversation meta with schema states and section status
     const convo = conversationId ? await ConversationService.getById(conversationId) : null;
     const meta = convo?.meta_jsonb || {};
     const currentLead = normalizeIntakeSchema(meta.lead_schema || baseLeadSchema);
     const currentDyn = normalizeIntakeSchema(meta.dyn_schema || baseDynSchema);
+    const completedSections = Array.isArray(meta.completed_sections) ? meta.completed_sections : [];
 
     // Pull history (capped)
     const historyTurns = Math.max(0, Number(llmconfig.history?.turns || 8));
@@ -71,13 +72,15 @@ export class BotOrchestrator {
       leadSchema: currentLead,
       dynSchema: currentDyn,
       passages,
-      includeBackHint: Boolean(llmconfig.prompt?.includeBackHint)
+      includeBackHint: Boolean(llmconfig.prompt?.includeBackHint),
+      completedSections
     });
 
     let assistant = '';
     let leadUpdates = [];
     let dynUpdates = [];
     let intakeCompleteFlag = false;
+    let doneSections = [];
 
     if (this.llm.isEnabled()) {
       const { text } = await this.llm.makeLlmCall({
@@ -92,6 +95,7 @@ export class BotOrchestrator {
       if (Array.isArray(json.lead_updates)) leadUpdates = json.lead_updates;
       if (Array.isArray(json.dyn_updates)) dynUpdates = json.dyn_updates;
       if (typeof json.intake_complete === 'boolean') intakeCompleteFlag = json.intake_complete;
+      if (Array.isArray(json.done_sections)) doneSections = json.done_sections;
     }
 
     // Support "back": undo the last answered question
@@ -112,7 +116,9 @@ export class BotOrchestrator {
 
     // Persist updated schema states on conversation meta
     if (conversationId) {
-      const nextMeta = { ...meta, lead_schema: mergedLead, dyn_schema: mergedDyn, stack };
+      const completedSet = new Set(completedSections);
+      for (const s of doneSections) completedSet.add(s);
+      const nextMeta = { ...meta, lead_schema: mergedLead, dyn_schema: mergedDyn, stack, completed_sections: Array.from(completedSet) };
       await ConversationService.updateMeta(conversationId, nextMeta);
     }
 
@@ -152,7 +158,8 @@ export class BotOrchestrator {
       uiText: `${assistant}${suggestionText}`,
       proposedUpdates: [], // kept for backward-compat with UI; updates are applied server-side
       nextAction: 'answer',
-      citations
+      citations,
+      doneSections
     };
   }
 }

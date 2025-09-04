@@ -6,6 +6,8 @@ import SchemaBuilderService from '../services/schema_builder_service.js';
 
 const isUuid = (s) => typeof s === 'string' && /^[0-9a-fA-F-]{36}$/.test(s);
 
+const flowItem = Joi.string().valid('DYNAMIC_INFO_SCHEMA_STATE', 'POST_COLLECTION_INFORMATION', 'LEAD_SCHEMA_STATE');
+
 const createSchema = Joi.object({
   name: Joi.string().min(2).max(255).required(),
   welcome_message: Joi.string().allow(null, ''),
@@ -13,7 +15,9 @@ const createSchema = Joi.object({
   special_instructions: Joi.string().allow(null, ''),
   specialInstructions: Joi.string().allow(null, ''),
   modules_jsonb: Joi.object().default({}),
-  modules: Joi.object()
+  modules: Joi.object(),
+  chat_flow_jsonb: Joi.array().items(flowItem),
+  chatFlow: Joi.array().items(flowItem)
 }).unknown(true);
 
 const updateSchema = Joi.object({
@@ -34,7 +38,9 @@ const updateSchema = Joi.object({
   dynamic_info_schema_jsonb: Joi.object(),
   dynamicInfoSchema: Joi.object(),
   modules_jsonb: Joi.object(),
-  modules: Joi.object()
+  modules: Joi.object(),
+  chat_flow_jsonb: Joi.array().items(flowItem),
+  chatFlow: Joi.array().items(flowItem)
 }).unknown(true);
 
 export class AgentsController {
@@ -59,7 +65,8 @@ export class AgentsController {
         name: value.name,
         welcome_message: value.welcome_message ?? value.welcomeMessage ?? null,
         special_instructions: value.special_instructions ?? value.specialInstructions ?? null,
-        modules_jsonb: value.modules_jsonb ?? value.modules ?? {}
+        modules_jsonb: value.modules_jsonb ?? value.modules ?? {},
+        chat_flow_jsonb: value.chat_flow_jsonb ?? value.chatFlow ?? ['DYNAMIC_INFO_SCHEMA_STATE', 'POST_COLLECTION_INFORMATION', 'LEAD_SCHEMA_STATE']
       };
       const agent = await AgentService.createForOrg(req.user.id, orgId, payload);
       if (!agent) return res.status(403).json({ error: 'Forbidden' });
@@ -95,6 +102,7 @@ export class AgentsController {
       if (value.modules !== undefined && updates.modules_jsonb === undefined) updates.modules_jsonb = value.modules;
       if (value.leadFormSchema !== undefined && updates.lead_form_schema_jsonb === undefined) updates.lead_form_schema_jsonb = value.leadFormSchema;
       if (value.dynamicInfoSchema !== undefined && updates.dynamic_info_schema_jsonb === undefined) updates.dynamic_info_schema_jsonb = value.dynamicInfoSchema;
+      if (value.chatFlow !== undefined && updates.chat_flow_jsonb === undefined) updates.chat_flow_jsonb = value.chatFlow;
 
       // Normalize natural text field
       if (value.leadSchemaNaturalText !== undefined && updates.lead_schema_natural_text === undefined) {

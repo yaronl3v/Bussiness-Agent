@@ -52,6 +52,7 @@ export const ensureOptionalColumns = async () => {
     // Add new columns if they are missing; safe to run multiple times
     await sequelize.query("ALTER TABLE agents ADD COLUMN IF NOT EXISTS dynamic_info_schema_natural_text TEXT;");
     await sequelize.query("ALTER TABLE agents ADD COLUMN IF NOT EXISTS post_collection_information_text TEXT;");
+    await sequelize.query("ALTER TABLE agents ADD COLUMN IF NOT EXISTS chat_flow_jsonb JSONB DEFAULT '[\"DYNAMIC_INFO_SCHEMA_STATE\",\"POST_COLLECTION_INFORMATION\",\"LEAD_SCHEMA_STATE\"]'::jsonb;");
   } catch (error) {
     console.warn('Optional schema ensure failed', { error: error?.message });
   }

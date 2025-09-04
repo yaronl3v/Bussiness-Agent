@@ -69,7 +69,7 @@ export class ConversationsController {
       const assistantMsg = await ConversationService.sendAssistant({ conversationId: id, text: response.uiText || '', citations: response.citations || [] });
       const durationSec = (Date.now() - routeStart) / 1000;
         try { console.log('Conversation response complete', { conversationId: id, agentId, userId: req.user.id, duration_s: Number(durationSec.toFixed(3)) }); } catch {}
-      const payload = { user: userMsg, assistant: assistantMsg, citations: response.citations || [], conversationId: id };
+      const payload = { user: userMsg, assistant: assistantMsg, citations: response.citations || [], conversationId: id, doneSections: response.doneSections || [] };
       if (createdFresh && welcomeMsg) payload.welcome = welcomeMsg;
       return res.status(201).json(payload);
     } catch (err) { next(err); }

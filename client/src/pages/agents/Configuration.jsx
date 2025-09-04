@@ -8,6 +8,13 @@ import Button from '../../components/ui/Button.jsx';
 import Card from '../../components/ui/Card.jsx';
 import TextArea from '../../components/ui/TextArea.jsx';
 
+const DEFAULT_FLOW = ['DYNAMIC_INFO_SCHEMA_STATE', 'POST_COLLECTION_INFORMATION', 'LEAD_SCHEMA_STATE'];
+const SECTION_LABELS = {
+  DYNAMIC_INFO_SCHEMA_STATE: 'Additional Questions',
+  POST_COLLECTION_INFORMATION: 'Post-Collection Message',
+  LEAD_SCHEMA_STATE: 'Lead Details'
+};
+
 export default function Configuration() {
   const { agent, orgId } = useOutletContext();
   const { success, error } = useToast();
@@ -25,10 +32,12 @@ export default function Configuration() {
     leadSchemaNaturalText: '',
     leadForm: [],
     dynamicNaturalText: '',
-    dynamicSchema: { sections: [] }
+    dynamicSchema: { sections: [] },
+    chatFlow: DEFAULT_FLOW
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [dragIndex, setDragIndex] = useState(null);
 
   // Initialize config from agent data
   useEffect(() => {
@@ -61,6 +70,10 @@ export default function Configuration() {
         dynamicSchemaData = { sections: [] };
       }
 
+      const chatFlowData = Array.isArray(agent.chat_flow_jsonb || agent.chatFlow) && (agent.chat_flow_jsonb || agent.chatFlow).length > 0
+        ? (agent.chat_flow_jsonb || agent.chatFlow)
+        : DEFAULT_FLOW;
+
       setConfig({
         welcomeMessage: agent.welcome_message || agent.welcomeMessage || '',
         specialInstructions: agent.special_instructions || agent.specialInstructions || '',
@@ -69,7 +82,8 @@ export default function Configuration() {
         leadSchemaNaturalText,
         leadForm: leadFormData,
         dynamicNaturalText: agent.dynamic_info_schema_natural_text || agent.dynamicInfoSchemaNaturalText || '',
-        dynamicSchema: dynamicSchemaData
+        dynamicSchema: dynamicSchemaData,
+        chatFlow: chatFlowData
       });
     }
   }, [agent]);
@@ -86,7 +100,8 @@ export default function Configuration() {
         modules: config.modules,
         leadSchemaNaturalText: config.leadSchemaNaturalText,
         dynamicInfoSchemaNaturalText: config.dynamicNaturalText,
-        dynamicInfoSchema: config.dynamicSchema
+        dynamicInfoSchema: config.dynamicSchema,
+        chatFlow: config.chatFlow
       });
       setHasUnsavedChanges(false);
       success('Configuration saved');
@@ -155,6 +170,10 @@ export default function Configuration() {
         dynamicSchemaData = { sections: [] };
       }
 
+      const chatFlowData = Array.isArray(agent.chat_flow_jsonb || agent.chatFlow) && (agent.chat_flow_jsonb || agent.chatFlow).length > 0
+        ? (agent.chat_flow_jsonb || agent.chatFlow)
+        : DEFAULT_FLOW;
+
       setConfig({
         welcomeMessage: agent.welcome_message || agent.welcomeMessage || '',
         specialInstructions: agent.special_instructions || agent.specialInstructions || '',
@@ -163,10 +182,20 @@ export default function Configuration() {
         leadSchemaNaturalText,
         leadForm: leadFormData,
         dynamicNaturalText: agent.dynamic_info_schema_natural_text || agent.dynamicInfoSchemaNaturalText || '',
-        dynamicSchema: dynamicSchemaData
+        dynamicSchema: dynamicSchemaData,
+        chatFlow: chatFlowData
       });
     }
     setHasUnsavedChanges(false);
+  };
+
+  const handleFlowDrop = (index) => {
+    if (dragIndex === null) return;
+    const newOrder = [...config.chatFlow];
+    const [moved] = newOrder.splice(dragIndex, 1);
+    newOrder.splice(index, 0, moved);
+    setDragIndex(null);
+    updateConfig('chatFlow', newOrder);
   };
 
   const updateConfig = (path, value) => {
@@ -222,13 +251,35 @@ export default function Configuration() {
       {/* Post-Collection Information */}
       <Card>
         <TextArea
-          label="Post-Collection Information"
+          label="Post-Collection Message"
           rows={5}
           placeholder="Write the message to send after all required details are collected."
           value={config.postCollectionInformationText}
           onChange={(e) => updateConfig('postCollectionInformationText', e.target.value)}
           hint="After collecting the user's details, the bot will send this message tailored to the user's attributes (e.g., gender), in their language."
         />
+      </Card>
+
+      {/* Conversation Flow */}
+      <Card>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Conversation Flow</h3>
+        <p className="text-sm text-gray-500 mb-3">Drag to set the order in which the bot handles each section.</p>
+        <ul>
+          {config.chatFlow.map((id, index) => (
+            <li
+              key={id}
+              draggable
+              onDragStart={() => setDragIndex(index)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => handleFlowDrop(index)}
+              onDragEnd={() => setDragIndex(null)}
+              className="p-2 mb-2 bg-gray-50 border rounded flex items-center justify-between cursor-move"
+            >
+              <span>{SECTION_LABELS[id] || id}</span>
+              <span className="text-gray-400">⋮⋮</span>
+            </li>
+          ))}
+        </ul>
       </Card>
 
       {/* Conversation Behavior */}
@@ -299,10 +350,10 @@ export default function Configuration() {
         </div>
       </Card>
 
-      {/* Lead Schema (Natural Language) */}
+      {/* Lead Details (Natural Language) */}
       <Card>
         <TextArea
-          label="Lead Schema (Natural Language)"
+          label="Lead Details (Natural Language)"
           rows={5}
           placeholder="Full name, Phone number - 9 digits, Email, ..."
           value={config.leadSchemaNaturalText}
@@ -328,10 +379,10 @@ export default function Configuration() {
         )}
       </Card>
 
-      {/* Dynamic Info (Natural Language) */}
+      {/* Additional Questions (Natural Language) */}
       <Card>
         <TextArea
-          label="Dynamic Info (Natural Language)"
+          label="Additional Questions (Natural Language)"
           rows={5}
           placeholder="Do you have kids?; Preferred contact time; Budget range..."
           value={config.dynamicNaturalText}
@@ -340,14 +391,14 @@ export default function Configuration() {
         />
       </Card>
 
-      {/* Dynamic Info (JSON Editor) */}
+      {/* Additional Questions (JSON Editor) */}
       <Card>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Dynamic Info Schema (JSON)</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Additional Questions Schema (JSON)</h3>
         <p className="text-sm text-gray-500 mb-3">Structure: {`{ sections: [ { id, title, questions: [ { id, label, type, required?, question? } ] } ] }`}</p>
-        <JsonEditor 
+        <JsonEditor
           value={config.dynamicSchema}
           onChange={(val) => updateConfig('dynamicSchema', val)}
-          label="Dynamic Info Schema"
+          label="Additional Questions Schema"
           height="240px"
         />
       </Card>
