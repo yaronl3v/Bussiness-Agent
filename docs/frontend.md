@@ -24,11 +24,30 @@ This plan translates the product spec into concrete screens, flows, and componen
     - `/agents/:agentId/leads`
     - `/agents/:agentId/conversations`
 
+- **Invites**
+  - `/accept-invite/:token` (client route to capture token and accept after auth)
+
 ### Global Layout & Navigation
 - **Top bar**: product name, org switcher (if multiple), environment badge, profile menu (logout), help.
 - **Secondary nav (Agent Detail)**: horizontal tabs: Data, WhatsApp, Configuration, Test Chat, Leads, Conversations.
 - **Content area**: page header with agent name, status pill, quick actions (Activate/Disable), and tab content below.
 - **Feedback**: global toast system; inline form errors; confirm dialogs for destructive actions.
+
+### Organizations & Invites (UI/Flow)
+- **Org selection on boot**:
+  - After login, call `GET /api/orgs`.
+  - If exactly 1 org → select automatically; if 0 → prompt to create org; if >1 → show org picker.
+  - Persist `selectedOrgId` in `localStorage`; validate it exists on every app load.
+- **Org switcher**:
+  - Dropdown in top bar to choose current org; include actions: Switch org, Create org, Invite users.
+- **Invite users**:
+  - Accessible from Agents List header and org switcher.
+  - Modal: Email field → `POST /api/orgs/:id/invites`. On success, show confirmation toast.
+- **Accept invite**:
+  - Route `/accept-invite/:token` stores token (e.g., `sessionStorage.inviteToken`). If unauthenticated → redirect to `/login`.
+  - After auth, client calls `POST /api/invites/:token/accept`, then refreshes `GET /api/orgs`, sets `selectedOrgId` to the joined org, and routes to `/agents`.
+- **Permissions**:
+  - Invited users join the inviter’s organization and can view and edit existing agents per org policies.
 
 ### Shared Components
 - **Form primitives**: labeled input, select, textarea, checkbox, toggle, date/time, phone (E.164), JSON editor (monaco-lite) for advanced schema edits.
@@ -227,5 +246,6 @@ This plan translates the product spec into concrete screens, flows, and componen
 - Leads: `GET /api/agents/:id/leads`, `PATCH /api/leads/:id`
 - Vendors: `GET/POST /api/agents/:id/vendors`, `PATCH/DELETE /api/vendors/:id`, `POST /api/agents/:id/route`
 - Webhooks: `GET/POST /api/webhooks/whatsapp`
+ - Invites: `POST /api/orgs/:id/invites`, `POST /api/invites/:token/accept`
 
 

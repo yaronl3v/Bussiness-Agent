@@ -19,7 +19,8 @@ cp env.example .env
 Required variables:
 - `PG_DATABASE_URL`: PostgreSQL connection string
 - `JWT_SECRET`: Secret key for JWT tokens
-- `OPENAI_API_KEY`: OpenAI API key for LLM services
+- `OPENAI_API_KEY`: OpenAI API key (embeddings)
+- `OPENROUTER_API_KEY`: OpenRouter API key (chat/responses)
 
 ### Installation
 

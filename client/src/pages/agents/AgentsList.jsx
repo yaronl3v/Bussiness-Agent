@@ -7,7 +7,8 @@ import {
   PlayIcon,
   PauseIcon,
   TrashIcon,
-  PencilIcon
+  PencilIcon,
+  UserPlusIcon
 } from '@heroicons/react/24/outline';
 import { agentsService } from '../../services/index.js';
 import { useOrganization } from '../../hooks/useOrganization.js';
@@ -19,6 +20,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
 import LoadingSpinner from '../../components/ui/LoadingSpinner.jsx';
+import InviteModal from '../../components/InviteModal.jsx';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function AgentsList() {
@@ -28,6 +30,7 @@ export default function AgentsList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
 
   const {
@@ -188,10 +191,20 @@ export default function AgentsList() {
               Manage your AI agents and their configurations
             </p>
           </div>
-          <Button onClick={() => setShowCreateModal(true)} className="sm:w-auto">
-            <PlusIcon className="h-4 w-4 mr-2" />
-            Create Agent
-          </Button>
+          <div className="flex items-center space-x-3">
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowInviteModal(true)}
+              className="sm:w-auto"
+            >
+              <UserPlusIcon className="h-4 w-4 mr-2" />
+              Invite Users
+            </Button>
+            <Button onClick={() => setShowCreateModal(true)} className="sm:w-auto">
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Create Agent
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -320,15 +333,7 @@ export default function AgentsList() {
               error={errors.name?.message}
             />
             
-            <div>
-              <label className="form-label">Welcome Message (Optional)</label>
-              <textarea
-                className="form-textarea"
-                rows={3}
-                placeholder="Enter a welcome message for users..."
-                {...register('welcomeMessage')}
-              />
-            </div>
+            {/* Welcome Message moved to Configuration tab */}
 
             <div className="flex justify-end space-x-3 pt-4">
               <Button
@@ -348,6 +353,12 @@ export default function AgentsList() {
             </div>
           </form>
         </Modal>
+
+        <InviteModal 
+          isOpen={showInviteModal} 
+          onClose={() => setShowInviteModal(false)} 
+          orgId={orgId} 
+        />
       </div>
     </AppLayout>
   );

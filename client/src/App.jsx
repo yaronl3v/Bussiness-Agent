@@ -1,9 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { authService } from './services/index.js';
-import { useToast } from './hooks/useToast.js';
-import { ToastContainer } from './components/ui/Toast.jsx';
+import { ToastProvider } from './hooks/useToast.jsx';
 import Login from './pages/auth/Login.jsx';
 import Register from './pages/auth/Register.jsx';
+import AcceptInvite from './pages/auth/AcceptInvite.jsx';
 import AgentsList from './pages/agents/AgentsList.jsx';
 import AgentDetail from './pages/agents/AgentDetail.jsx';
 import DataManager from './pages/agents/DataManager.jsx';
@@ -24,11 +24,10 @@ function PublicRoute({ children }) {
 }
 
 function App() {
-  const { toasts, removeToast } = useToast();
-
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50">
+      <ToastProvider>
+        <div className="min-h-screen bg-gradient-to-br from-green-50 via-gray-50/30 to-orange-50/20">
         <Routes>
           {/* Auth routes */}
           <Route 
@@ -46,6 +45,12 @@ function App() {
                 <Register />
               </PublicRoute>
             } 
+          />
+          
+          {/* Accept invite route - handles both authenticated and unauthenticated users */}
+          <Route 
+            path="/accept-invite/:token" 
+            element={<AcceptInvite />} 
           />
           
           {/* Protected routes */}
@@ -78,11 +83,11 @@ function App() {
           <Route path="/" element={<Navigate to="/agents" />} />
         </Routes>
         
-        {/* Toast Container */}
-        <ToastContainer toasts={toasts} removeToast={removeToast} />
-      </div>
+        </div>
+      </ToastProvider>
     </Router>
   );
 }
 
 export default App;
+

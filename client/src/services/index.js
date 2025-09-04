@@ -4,6 +4,7 @@
  */
 
 import apiClient from './ApiClient.js';
+import { API_CONFIG } from './config.js';
 import { ENDPOINTS, buildUrl, QUERY_PARAMS } from './endpoints.js';
 
 /**
@@ -114,8 +115,6 @@ export const agentsService = {
     // Convert camelCase to snake_case for server
     const serverData = {
       name: data.name,
-      welcome_message: data.welcomeMessage || '',
-      special_instructions: data.specialInstructions || '',
       modules_jsonb: data.modules || {}
     };
     return await apiClient.post(ENDPOINTS.AGENTS.CREATE(orgId), serverData);
@@ -131,6 +130,8 @@ export const agentsService = {
     if (data.leadSchemaNaturalText !== undefined) serverData.lead_schema_natural_text = data.leadSchemaNaturalText;
     if (data.leadFormSchema !== undefined) serverData.lead_form_schema_jsonb = data.leadFormSchema;
     if (data.dynamicInfoSchema !== undefined) serverData.dynamic_info_schema_jsonb = data.dynamicInfoSchema;
+    if (data.dynamicInfoSchemaNaturalText !== undefined) serverData.dynamic_info_schema_natural_text = data.dynamicInfoSchemaNaturalText;
+    if (data.postCollectionInformationText !== undefined) serverData.post_collection_information_text = data.postCollectionInformationText;
     if (data.modules !== undefined) serverData.modules_jsonb = data.modules;
     
     return await apiClient.patch(ENDPOINTS.AGENTS.UPDATE(orgId, agentId), serverData);
@@ -226,7 +227,7 @@ export const conversationsService = {
       content,
       agentId: agentId  // Use camelCase as server expects
     };
-    return await apiClient.post(ENDPOINTS.CONVERSATIONS.SEND_MESSAGE(conversationId), messageData);
+    return await apiClient.post(ENDPOINTS.CONVERSATIONS.SEND_MESSAGE(conversationId), messageData, { timeout: API_CONFIG.CHAT_TIMEOUT_MS });
   },
 
   async sendFirstMessage(agentId, content, role = 'user') {
@@ -236,7 +237,7 @@ export const conversationsService = {
       content,
       agentId: agentId
     };
-    return await apiClient.post(ENDPOINTS.CONVERSATIONS.SEND_NEW_MESSAGE, messageData);
+    return await apiClient.post(ENDPOINTS.CONVERSATIONS.SEND_NEW_MESSAGE, messageData, { timeout: API_CONFIG.CHAT_TIMEOUT_MS });
   },
 
   async createConversation(agentId, clientId = null, channel = 'inapp') {
@@ -266,8 +267,23 @@ export const leadsService = {
   async getLeads(agentId, params = {}) {
     const url = buildUrl(ENDPOINTS.LEADS.LIST(agentId), params);
     const response = await apiClient.get(url);
-    // Handle both direct array and { data: [...] } response formats
-    return Array.isArray(response) ? response : (response?.data || []);
+    // Normalize to array
+    const raw = Array.isArray(response) ? response : (response?.data || []);
+    // Map snake_case to camelCase fields the UI expects
+    return raw.map(item => {
+      const leadJsonb = item.leadJsonb || item.lead_jsonb || {};
+      const name = leadJsonb.full_name || leadJsonb.name || [leadJsonb.first_name, leadJsonb.last_name].filter(Boolean).join(' ').trim() || '';
+      const email = leadJsonb.email || leadJsonb.email_address || '';
+      const phone = leadJsonb.phone || leadJsonb.phone_number || '';
+      return {
+        ...item,
+        leadJsonb,
+        name,
+        email,
+        phone,
+        conversationId: item.conversationId || item.conversation_id || null
+      };
+    });
   },
 
   async updateLead(leadId, data) {
@@ -391,3 +407,4 @@ export { apiClient };
 
 // Export query parameters for easy use
 export { QUERY_PARAMS };
+

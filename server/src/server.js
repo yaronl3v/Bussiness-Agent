@@ -1,7 +1,7 @@
 import app from './app.js';
 
 import { logger } from './config/logger.js';
-import { testConnection } from './db/sequelize.js';
+import { testConnection, ensureOptionalColumns } from './db/sequelize.js';
 
 // Test database connection before starting server
 const startServer = async () => {
@@ -12,6 +12,9 @@ const startServer = async () => {
       logger.error('Failed to connect to database. Exiting...');
       process.exit(1);
     }
+
+    // Ensure optional columns exist (safe idempotent DDL)
+    await ensureOptionalColumns();
 
     // Start HTTP server
     const port = process.env.PORT || 3000;

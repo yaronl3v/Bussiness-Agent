@@ -31,6 +31,17 @@ export function useOrganization() {
     bootstrapSession();
   }, []);
 
+  const refreshOrganizations = async () => {
+    try {
+      const session = await authService.bootstrapSession();
+      setOrganizations(session.organizations);
+      return session;
+    } catch (error) {
+      console.error('Failed to refresh organizations:', error);
+      throw error;
+    }
+  };
+
   const selectOrganization = (selectedOrgId) => {
     authService.setCurrentOrgId(selectedOrgId);
     setOrgId(selectedOrgId);
@@ -42,6 +53,7 @@ export function useOrganization() {
     organizations, 
     loading, 
     needsOrgSelection,
-    selectOrganization
+    selectOrganization,
+    refreshOrganizations
   };
 }

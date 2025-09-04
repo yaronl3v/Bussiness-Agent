@@ -47,6 +47,17 @@ export const testConnection = async () => {
   }
 };
 
+// Ensure backward-compatible optional columns exist to prevent runtime errors
+export const ensureOptionalColumns = async () => {
+  try {
+    // Add new columns if they are missing; safe to run multiple times
+    await sequelize.query("ALTER TABLE agents ADD COLUMN IF NOT EXISTS dynamic_info_schema_natural_text TEXT;");
+    await sequelize.query("ALTER TABLE agents ADD COLUMN IF NOT EXISTS post_collection_information_text TEXT;");
+  } catch (error) {
+    logger.warn('Optional schema ensure failed', { error: error?.message });
+  }
+};
+
 // Sync database (use with caution in production)
 export const syncDatabase = async (force = false) => {
   try {

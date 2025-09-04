@@ -3,7 +3,7 @@ import { vendorsService } from '../services/index.js';
 import Button from './ui/Button.jsx';
 import Modal from './ui/Modal.jsx';
 import Input from './ui/Input.jsx';
-import { useToast } from '../hooks/useToast.js';
+import { useToast } from '../hooks/useToast.jsx';
 
 export default function VendorRouting({ 
   isOpen, 
@@ -116,3 +116,4 @@ export default function VendorRouting({
     </Modal>
   );
 }
+

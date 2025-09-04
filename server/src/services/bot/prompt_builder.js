@@ -32,6 +32,7 @@ function schemaToReadable(schema) {
       const parts = [];
       parts.push(`- id: ${q.id}`);
       if (q.label) parts.push(`label: ${q.label}`);
+      if (q.question) parts.push(`question: ${q.question}`);
       if (q.type) parts.push(`type: ${q.type}`);
       if (q.required) parts.push('required: true');
       // always include collected flag
@@ -64,6 +65,9 @@ export async function buildSinglePrompt({
   const agentName = agent?.dataValues?.name || '';
   const businessName = agentName;
   const specialInstructions = agent?.dataValues?.special_instructions || '';
+  const postCollectionInformationText = agent?.dataValues?.post_collection_information_text || '';
+  const modules = (agent?.dataValues?.modules_jsonb && typeof agent?.dataValues?.modules_jsonb === 'object') ? agent.dataValues.modules_jsonb : {};
+  const allowQuestionsBeforeGathering = (typeof modules.allowQuestionsBeforeGathering === 'boolean') ? modules.allowQuestionsBeforeGathering : true;
   const lang = detectLanguageFromText(
     userMessage || history?.[history.length - 1]?.content_jsonb?.text || ''
   );
@@ -74,12 +78,14 @@ export async function buildSinglePrompt({
     languageName: lang.languageName,
     textDirection: lang.textDirection,
     specialInstructions: specialInstructions || '',
+    postCollectionInformationText: postCollectionInformationText || '',
     leadSchemaState: leadSchema ? schemaToReadable(leadSchema) : '',
     dynamicInfoSchemaState: dynSchema ? schemaToReadable(dynSchema) : '',
     contextPassages: formatContextPassages(passages) || '',
     chatHistory: formatHistory(history) || '',
     backHint: includeBackHint ? 'Users may type "back" to revisit the previous question or "skip" to skip the current one.' : '',
-    currentUserMessage: userMessage || ''
+    currentUserMessage: userMessage || '',
+    allowQuestionsBeforeGathering: allowQuestionsBeforeGathering ? 'true' : 'false'
   };
 
   const promptText = await loadPrompt('single_prompt.txt', variables, lang.locale);

@@ -20,7 +20,7 @@ export default function TestChat() {
   const [inspectorData, setInspectorData] = useState(null);
   const [conversationId, setConversationId] = useState(null);
 
-  // Initialize conversation and welcome message
+  // Initialize conversation (no front-end welcome)
   useEffect(() => {
     if (agent) {
       initializeConversation();
@@ -36,22 +36,15 @@ export default function TestChat() {
       setConversationId(persistedConvId);
       loadConversationHistory(persistedConvId);
     } else {
-      // Start fresh with welcome message
-      setConversationId(null); // Will be set after first message
-      setMessages([
-        {
-          id: 1,
-          role: 'agent',
-          content: agent.welcome_message || agent.welcomeMessage || 'Hello! How can I help you today?',
-          timestamp: new Date()
-        }
-      ]);
+      // Start fresh with empty history; server will provide welcome on first turn
+      setConversationId(null);
+      setMessages([]);
     }
   };
 
   const loadConversationHistory = async (convId) => {
     try {
-      setLoading(true);
+      setIsLoading(true);
       const history = await conversationsService.getConversationMessages(convId);
       
       // Convert server messages to our format, handling nested content structure
@@ -70,7 +63,7 @@ export default function TestChat() {
       // Start fresh if we can't load history
       startNewConversation();
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -78,14 +71,7 @@ export default function TestChat() {
     // Clear persisted conversation
     localStorage.removeItem(`conversation_${agent.id}`);
     setConversationId(null);
-    setMessages([
-      {
-        id: 1,
-        role: 'agent',
-        content: agent.welcome_message || agent.welcomeMessage || 'Hello! How can I help you today?',
-        timestamp: new Date()
-      }
-    ]);
+    setMessages([]);
     setInspectorData(null);
   };
 
@@ -114,6 +100,45 @@ export default function TestChat() {
           setConversationId(response.conversationId);
           localStorage.setItem(`conversation_${agent.id}`, response.conversationId);
         }
+        // If server provided a welcome message, append it after the user's message, then the assistant reply
+        if (response.welcome) {
+          const welcomeContent = response.welcome.content_jsonb?.text || response.welcome.content || '';
+          const welcomeMsg = {
+            id: response.welcome.id || Date.now() - 1,
+            role: 'agent',
+            content: welcomeContent,
+            timestamp: new Date(response.welcome.createdAt || new Date())
+          };
+          const assistantContent =
+            response.assistant?.content_jsonb?.text ||
+            response.assistant?.content ||
+            'I apologize, but I couldn\'t generate a proper response.';
+          const agentResponse = {
+            id: Date.now() + 1,
+            role: 'agent',
+            content: assistantContent,
+            timestamp: new Date(response.assistant?.createdAt || new Date()),
+            citations: response.citations || response.assistant?.citations_jsonb || [],
+            metadata: {
+              messageId: response.assistant?.id,
+              conversationId: response.conversationId,
+              responseTime: response.responseTime,
+              tokensUsed: response.tokensUsed,
+              model: response.model
+            }
+          };
+          // Order: user (already added) -> welcome -> assistant
+          setMessages(prev => [...prev, welcomeMsg, agentResponse]);
+          // Update inspector data
+          setInspectorData({
+            retrieval: response.citations || [],
+            intakeUpdates: response.intakeUpdates || {},
+            nextAction: response.nextAction || { type: 'continue', summary: 'Continue conversation' },
+            conversationId: response.conversationId,
+            lastResponse: response.assistant
+          });
+          return; // handled first-turn flow
+        }
       } else {
         // Subsequent messages - use existing conversation ID
         response = await conversationsService.sendMessage(
@@ -124,39 +149,49 @@ export default function TestChat() {
         );
       }
 
-      // The response should include assistant message with citations
-      if (response.assistant) {
-        // Extract content from the nested structure
-        const assistantContent = 
-          response.assistant.content_jsonb?.text || 
-          response.assistant.content || 
+      // Safely extract and append the assistant message
+      try {
+        const assistantObj = response?.assistant || null;
+        const assistantText =
+          (assistantObj?.content_jsonb && typeof assistantObj.content_jsonb.text === 'string' && assistantObj.content_jsonb.text) ||
+          (typeof assistantObj?.content === 'string' && assistantObj.content) ||
+          (typeof response?.uiText === 'string' && response.uiText) ||
           'I apologize, but I couldn\'t generate a proper response.';
 
         const agentResponse = {
           id: Date.now() + 1,
           role: 'agent',
-          content: assistantContent,
-          timestamp: new Date(response.assistant.createdAt || new Date()),
-          citations: response.citations || response.assistant.citations_jsonb || [],
+          content: assistantText,
+          timestamp: new Date((assistantObj && assistantObj.createdAt) || new Date()),
+          citations: (Array.isArray(response?.citations) && response.citations) || assistantObj?.citations_jsonb || [],
           metadata: {
-            messageId: response.assistant.id,
-            conversationId: response.conversationId,
-            responseTime: response.responseTime,
-            tokensUsed: response.tokensUsed,
-            model: response.model
+            messageId: assistantObj?.id,
+            conversationId: response?.conversationId,
+            responseTime: response?.responseTime,
+            tokensUsed: response?.tokensUsed,
+            model: response?.model
           }
         };
 
         setMessages(prev => [...prev, agentResponse]);
 
-        // Update inspector data with proper citation format
+        // Inspector is best-effort; guard optional fields
         setInspectorData({
-          retrieval: response.citations || [],
-          intakeUpdates: response.intakeUpdates || {},
-          nextAction: response.nextAction || { type: 'continue', summary: 'Continue conversation' },
-          conversationId: response.conversationId,
-          lastResponse: response.assistant
+          retrieval: (Array.isArray(response?.citations) && response.citations) || [],
+          intakeUpdates: response?.intakeUpdates || {},
+          nextAction: response?.nextAction || { type: 'continue', summary: 'Continue conversation' },
+          conversationId: response?.conversationId,
+          lastResponse: assistantObj || null
         });
+      } catch (e) {
+        console.error('Failed to render assistant message:', e, response);
+        const fallback = {
+          id: Date.now() + 1,
+          role: 'agent',
+          content: typeof response?.uiText === 'string' ? response.uiText : 'Thanks. I have recorded your details.',
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, fallback]);
       }
 
     } catch (error) {

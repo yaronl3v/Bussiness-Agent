@@ -9,7 +9,7 @@ import Card from '../../components/ui/Card.jsx';
 import TextArea from '../../components/ui/TextArea.jsx';
 
 export default function Configuration() {
-  const { agent, orgId } = useOutletContext();
+  const { agent, orgId, loadAgent } = useOutletContext();
   const { success, error } = useToast();
   const [config, setConfig] = useState({
     welcomeMessage: '',
@@ -19,8 +19,7 @@ export default function Configuration() {
       qna: true,
       recommendations: true,
       vendorRouting: false,
-      whatsappEnabled: false,
-      allowQuestionsBeforeGathering: true
+      whatsappEnabled: false
     },
     leadSchemaNaturalText: '',
     leadForm: [],
@@ -47,12 +46,8 @@ export default function Configuration() {
           qna: true,
           recommendations: true,
           vendorRouting: false,
-          whatsappEnabled: false,
-          allowQuestionsBeforeGathering: true
+          whatsappEnabled: false
         };
-      }
-      if (modulesData.allowQuestionsBeforeGathering === undefined) {
-        modulesData.allowQuestionsBeforeGathering = true;
       }
 
       // Ensure dynamicSchema is always properly structured
@@ -79,7 +74,7 @@ export default function Configuration() {
 
     try {
       setSaving(true);
-      await agentsService.updateAgent(orgId, agent.id, {
+      const resp = await agentsService.updateAgent(orgId, agent.id, {
         welcomeMessage: config.welcomeMessage,
         specialInstructions: config.specialInstructions,
         postCollectionInformationText: config.postCollectionInformationText,
@@ -229,34 +224,6 @@ export default function Configuration() {
           onChange={(e) => updateConfig('postCollectionInformationText', e.target.value)}
           hint="After collecting the user's details, the bot will send this message tailored to the user's attributes (e.g., gender), in their language."
         />
-      </Card>
-
-      {/* Conversation Behavior */}
-      <Card>
-        <div className="flex items-center gap-2 mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Conversation Behavior</h3>
-          <span className="text-sm text-purple-600 bg-purple-50 px-2 py-1 rounded-full">Flow</span>
-        </div>
-        <div className="flex items-start justify-between p-4 bg-gray-50 rounded-lg border-2 border-transparent hover:border-purple-200 transition-colors">
-          <div className="flex-1">
-            <h4 className="text-sm font-semibold text-gray-900">Allow questions before gathering info</h4>
-            <p className="text-sm text-gray-600 mt-1">
-              When enabled, the agent may answer user questions even if required intake fields are still missing, then continue collecting details.
-            </p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer ml-4">
-            <input
-              type="checkbox"
-              className="sr-only peer"
-              checked={!!config.modules.allowQuestionsBeforeGathering}
-              onChange={(e) => updateConfig('modules.allowQuestionsBeforeGathering', e.target.checked)}
-            />
-            <div className="w-12 h-7 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600 shadow-sm"></div>
-            <span className="ml-3 text-sm font-medium text-gray-700">
-              {config.modules.allowQuestionsBeforeGathering ? 'Enabled' : 'Disabled'}
-            </span>
-          </label>
-        </div>
       </Card>
 
       {/* Modules */}

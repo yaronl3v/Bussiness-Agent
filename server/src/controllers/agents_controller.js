@@ -2,6 +2,8 @@ import Joi from 'joi';
 import { AgentService } from '../services/agent_service.js';
 import IngestionService from '../services/ingestion_service.js';
 import LlmService from '../services/llm_service.js';
+import SchemaBuilderService from '../services/schema_builder_service.js';
+import { logger } from '../config/logger.js';
 
 const isUuid = (s) => typeof s === 'string' && /^[0-9a-fA-F-]{36}$/.test(s);
 
@@ -24,6 +26,10 @@ const updateSchema = Joi.object({
   specialInstructions: Joi.string().allow(null, ''),
   lead_schema_natural_text: Joi.string().allow(null, ''),
   leadSchemaNaturalText: Joi.string().allow(null, ''),
+  dynamic_info_schema_natural_text: Joi.string().allow(null, ''),
+  dynamicInfoSchemaNaturalText: Joi.string().allow(null, ''),
+  post_collection_information_text: Joi.string().allow(null, ''),
+  postCollectionInformationText: Joi.string().allow(null, ''),
   lead_form_schema_jsonb: Joi.object(),
   leadFormSchema: Joi.object(),
   dynamic_info_schema_jsonb: Joi.object(),
@@ -81,6 +87,10 @@ export class AgentsController {
       const { error, value } = updateSchema.validate(req.body);
       if (error) return res.status(400).json({ error: 'Validation error', details: error.details.map(d => d.message) });
       const updates = { ...value };
+
+      // Fetch current agent to compare for change detection
+      const currentAgent = await AgentService.getByIdForOrg(req.user.id, orgId, agentId);
+      if (!currentAgent) return res.status(404).json({ error: 'Not found' });
       if (value.welcomeMessage !== undefined && updates.welcome_message === undefined) updates.welcome_message = value.welcomeMessage;
       if (value.specialInstructions !== undefined && updates.special_instructions === undefined) updates.special_instructions = value.specialInstructions;
       if (value.modules !== undefined && updates.modules_jsonb === undefined) updates.modules_jsonb = value.modules;
@@ -91,39 +101,49 @@ export class AgentsController {
       if (value.leadSchemaNaturalText !== undefined && updates.lead_schema_natural_text === undefined) {
         updates.lead_schema_natural_text = value.leadSchemaNaturalText;
       }
-
-      // If natural text provided, parse into JSON schema via LLM
-      const providedNatural = updates.lead_schema_natural_text ?? null;
-      if (typeof providedNatural === 'string') {
-        try {
-          const llm = new LlmService();
-          if (llm.isEnabled() && providedNatural.trim().length > 0) {
-            const system = 'You convert business owners\' free-text descriptions of lead forms into a strict JSON schema. Output JSON only with fields: fields: [ { id, label, type, required, validation? } ]. Types: text, email, tel, number, date, select. Infer required from wording. Add id as snake_case of label. Never include comments.';
-            const user = `Create schema from this description:\n\n${providedNatural}\n\nOutput only JSON.`;
-            const { text } = await llm.chat({ system, user, model: process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini', temperature: 0 });
-            try {
-              const parsed = JSON.parse(text);
-              if (parsed && typeof parsed === 'object') {
-                updates.lead_form_schema_jsonb = parsed.fields || parsed;
-              }
-            } catch (e) {
-              // Try to extract JSON if wrapped
-              const match = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-              if (match) {
-                try {
-                  const parsed2 = JSON.parse(match[0]);
-                  updates.lead_form_schema_jsonb = parsed2.fields || parsed2;
-                } catch (_) {}
-              }
-            }
-          }
-        } catch (e) {
-          // ignore LLM errors; we still save natural text
-        }
+      if (value.dynamicInfoSchemaNaturalText !== undefined && updates.dynamic_info_schema_natural_text === undefined) {
+        updates.dynamic_info_schema_natural_text = value.dynamicInfoSchemaNaturalText;
       }
+      // Normalize post-collection information text
+      if (value.postCollectionInformationText !== undefined && updates.post_collection_information_text === undefined) {
+        updates.post_collection_information_text = value.postCollectionInformationText;
+      }
+
+      // Decide if background rebuilds are needed (when natural text changed)
+      const newLeadText = updates.lead_schema_natural_text;
+      const newDynText = updates.dynamic_info_schema_natural_text;
+      const changedLeadText = typeof newLeadText === 'string' && newLeadText !== (currentAgent.lead_schema_natural_text || '');
+      const changedDynText = typeof newDynText === 'string' && newDynText !== (currentAgent.dynamic_info_schema_natural_text || '');
+            // If the new natural text was cleared, also clear schema immediately
+      if (changedLeadText && typeof newLeadText === 'string' && newLeadText.trim().length === 0) {
+        updates.lead_form_schema_jsonb = [];
+        logger.info('Lead schema cleared due to empty natural text', { agentId });
+      }
+      if (changedDynText && typeof newDynText === 'string' && newDynText.trim().length === 0) {
+        updates.dynamic_info_schema_jsonb = { sections: [] };
+        logger.info('Dynamic schema cleared due to empty natural text', { agentId });
+      }
+
       const agent = await AgentService.updateForOrg(req.user.id, orgId, agentId, updates);
       if (!agent) return res.status(404).json({ error: 'Not found' });
-      return res.json(agent);
+
+      // Respond quickly; schedule background schema rebuilds if needed
+      res.json({ ...agent, background: { leadSchemaRebuild: changedLeadText, dynamicSchemaRebuild: changedDynText } });
+
+      // Fire-and-forget background tasks
+      try {
+        if (changedLeadText && newLeadText && newLeadText.trim().length > 0) {
+          try { logger.info('Scheduling background lead schema rebuild', { agentId }); } catch {}
+          setImmediate(() => SchemaBuilderService.rebuildLeadSchema(agentId, newLeadText).then(() => logger.info('Background lead schema rebuild complete', { agentId })).catch(e => logger.error('Lead rebuild async error', e, { agentId })));
+        }
+        if (changedDynText && newDynText && newDynText.trim().length > 0) {
+          try { logger.info('Scheduling background dynamic schema rebuild', { agentId }); } catch {}
+          setImmediate(() => SchemaBuilderService.rebuildDynamicSchema(agentId, newDynText).then(() => logger.info('Background dynamic schema rebuild complete', { agentId })).catch(e => logger.error('Dynamic rebuild async error', e, { agentId })));
+        }
+      } catch (e) {
+        logger.warn('Background rebuild scheduling failed', { error: e?.message });
+      }
+      return;
     } catch (err) { next(err); }
   }
 
@@ -163,3 +183,6 @@ export class AgentsController {
 }
 
 export default AgentsController;
+
+
+

@@ -35,6 +35,10 @@ Agent.init(
       type: DataTypes.TEXT,
       allowNull: true
     },
+    dynamic_info_schema_natural_text: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
     lead_schema_natural_text: {
       type: DataTypes.TEXT,
       allowNull: true
@@ -53,6 +57,11 @@ Agent.init(
       type: DataTypes.JSONB,
       allowNull: false,
       defaultValue: {}
+    }
+    ,
+    post_collection_information_text: {
+      type: DataTypes.TEXT,
+      allowNull: true
     }
   },
   {

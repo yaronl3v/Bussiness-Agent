@@ -32,6 +32,12 @@ export class ConversationService {
     return convo.dataValues;
   }
 
+  static async createNew({ agentId, clientId, channel = 'inapp' }) {
+    // Always create a fresh conversation (do not reuse by clientId)
+    const convo = await Conversation.create({ agent_id: agentId, client_id: clientId, channel, meta_jsonb: {} });
+    return convo.dataValues;
+  }
+
   static async sendMessage({ conversationId, role, content }) {
     const message = await Message.create({ conversation_id: conversationId, role, content_jsonb: { text: content }, citations_jsonb: [] });
     return message.dataValues;

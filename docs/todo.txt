@@ -1,21 +1,55 @@
- - welcome msg  - 
-Right now it used just for ui in front end, in the beinging of chat. Lets make some changes
-1. Lets replace its name to intro info. 
-2. Our funnel is such that first user interacts with bot then bot answers. so no need for auto msg on start.
-3. Instead the intro, is added to the agnet prompt, this tells the agent a bit about itself.
-Example, user may fill in "You are a landscape advisor names Uri". Then agent can use this info, when presenting itself however it see fit.
-
 
 ******************
 
 
+[test this should be done]
+2. ** todo: add to config tab, a switch "allow questions before gathering info." 
+this allows agent to asnwer user questions  before user answered all questions if provided.
+we need to 1. add this data to agent, if json then update, if not then need migration and add column
+2. add UI on front end
+3. add small section in prompt to explain this and pass current value per config so bot understand the behavour (via prompt)
 
--update server.md accordingly.
-- Add comments what each part do, didnt get the enable retrival enabled -> should be if user added docs then we use it , if not not.
--make sure you removed all old stuff that we dont need and were used, and that new approach is nicely organized to allow editing and further enhancemtns.
+
+--
+Need to make an upgrade.
+
+Right now user can set leads and dynamic schema then bot collects data in this order then give the post colection information.
+But what if user wants dynamic info then give post collection then do the lead schema collection? so we need a dnyamic flow.
+
+1. To config tab front end, lets add a component that allow user to pick the order of sections
+ [DYNAMIC_INFO_SCHEMA_STATE, POST_COLLECTION_INFORMATION, LEAD_SCHEMA_STATE]
+ user can simply drag up or down each item (give each a nice humnan understabnle name for users, same as you use in UI -> need to change
+ the naming in UI as well for section, so they are more clear for users and just better.
+
+2. As as far as bot we control this behaviour by adjusting prompt and sending variables to bot. 
+We can control this by adjusting the <Chat Flow> section, and maybe adjsuting what we say about each part.
+Goal is in each section just describe what it is not when it should performed, the chat flow controls the order.
+
+We give it the order of the sections and we adjust fix pormpt to make it clear what is each section, and the order of steps (we insert dynamicly)
+bot should do, we explain it clearly in prompt (make these adjusmt to single_prompt.txt)
+
+3. Need to enhance bot response protocol and processing, such that bot can report which parts are done.
+i.e done collecting lead info, done collecting dyamic info etc per what we need. Why? so when we get we can save data 
+in our db.
+
+So when this is done, user on front end can reorder and bot operate accordginly.
+Specifically bot can now do -> dynamic info, send post collectoin then lead state, or any other order.
 
 
 
-- conversation not connected at All
-- complete / redo whatsup with whatsup auth connect
-- front invite - see what we have on backend
+****
+[] Test + Complete knowledge injestion part
+
+
+**move the DB...
+======
+[test]Invites should be done
+
+[invites] with roles. read.
+
+[]Integrate whatsup + with whatsup onboarding
+** [later]need to complete conversation (have demo data to remove)
+right now conversations i guess is showing some demo data, instead it should show the actual data belonging to this agent.
+[]Fix UI a bit.
+[]LP
+[org leads menu]

@@ -77,6 +77,7 @@ export class BotOrchestrator {
     let assistant = '';
     let leadUpdates = [];
     let dynUpdates = [];
+    let intakeCompleteFlag = false;
 
     if (this.llm.isEnabled()) {
       const { text } = await this.llm.makeLlmCall({
@@ -84,12 +85,13 @@ export class BotOrchestrator {
         user: promptText,
         model: llmconfig.model,
         temperature: llmconfig.temperature,
-        promptName: 'single_prompt'
+        promptName: 'single_prompt.txt'
       });
       const json = extractFirstJson(text || '') || {};
       assistant = typeof json.assistant === 'string' && json.assistant.trim() ? json.assistant.trim() : '';
       if (Array.isArray(json.lead_updates)) leadUpdates = json.lead_updates;
       if (Array.isArray(json.dyn_updates)) dynUpdates = json.dyn_updates;
+      if (typeof json.intake_complete === 'boolean') intakeCompleteFlag = json.intake_complete;
     }
 
     // Support "back": undo the last answered question
@@ -101,8 +103,8 @@ export class BotOrchestrator {
     }
 
     // Merge updates into schema state
-    const mergedLead = IntakeService.merge(currentLead, leadUpdates);
-    const mergedDyn = IntakeService.merge(currentDyn, dynUpdates);
+    const mergedLead = IntakeService.merge(currentLead, leadUpdates, { createMissing: false });
+    const mergedDyn = IntakeService.merge(currentDyn, dynUpdates, { createMissing: true });
 
     // Push updated question IDs onto stack (to enable back)
     for (const u of leadUpdates) if (u?.questionId) stack.push(u.questionId);
@@ -114,9 +116,14 @@ export class BotOrchestrator {
       await ConversationService.updateMeta(conversationId, nextMeta);
     }
 
-    // Ensure a Lead record exists if any lead updates were detected
-    if (conversationId && (leadUpdates?.length || 0) > 0) {
-      await ensureLeadExists({ agentId: this.agentId, conversationId });
+    // Upsert lead snapshot each turn; mark status based on completeness of lead-required fields
+    if (conversationId) {
+      const leadAnswers = flattenAnswers(mergedLead);
+      const dynAnswers = flattenAnswers(mergedDyn);
+      const payload = { ...leadAnswers, ...dynAnswers };
+      const leadRequiredComplete = areRequiredCollected(mergedLead);
+      const finalComplete = Boolean(intakeCompleteFlag) || Boolean(leadRequiredComplete);
+      await upsertLead({ agentId: this.agentId, conversationId, payload, status: finalComplete ? 'qualified' : 'new' });
     }
 
     // Optional vendor suggestion (unchanged behavior)
@@ -181,6 +188,42 @@ async function ensureLeadExists({ agentId, conversationId }) {
   const existing = await Lead.findOne({ where: { agent_id: agentId, conversation_id: conversationId } });
   if (existing) return;
   await Lead.create({ agent_id: agentId, conversation_id: conversationId, lead_jsonb: {}, status: 'new' });
+}
+
+function flattenAnswers(schema) {
+  const out = {};
+  if (!schema || !Array.isArray(schema.sections)) return out;
+  for (const s of schema.sections) {
+    for (const q of s.questions || []) {
+      const has = q && q.id && (q.answer !== undefined && q.answer !== null && String(q.answer).trim() !== '');
+      if (has) out[q.id] = q.answer;
+    }
+  }
+  return out;
+}
+
+function areRequiredCollected(schema) {
+  if (!schema || !Array.isArray(schema.sections)) return true;
+  for (const s of schema.sections) {
+    for (const q of s.questions || []) {
+      if (q && q.required) {
+        const has = q.answer !== undefined && q.answer !== null && String(q.answer).trim() !== '';
+        if (!has) return false;
+      }
+    }
+  }
+  return true;
+}
+
+async function upsertLead({ agentId, conversationId, payload, status = 'new' }) {
+  if (!agentId || !conversationId) return;
+  const existing = await Lead.findOne({ where: { agent_id: agentId, conversation_id: conversationId } });
+  if (!existing) {
+    await Lead.create({ agent_id: agentId, conversation_id: conversationId, lead_jsonb: payload || {}, status });
+    return;
+  }
+  const next = { ...(existing.lead_jsonb || {}), ...(payload || {}) };
+  await Lead.update({ lead_jsonb: next, status }, { where: { id: existing.id } });
 }
 
 export default BotOrchestrator;

@@ -15,7 +15,7 @@ import EmptyState from '../../components/ui/EmptyState.jsx';
 import LoadingSpinner from '../../components/ui/LoadingSpinner.jsx';
 import Drawer from '../../components/ui/Drawer.jsx';
 import VendorRouting from '../../components/VendorRouting.jsx';
-import { useToast } from '../../hooks/useToast.js';
+import { useToast } from '../../hooks/useToast.jsx';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function Leads() {
@@ -27,7 +27,7 @@ export default function Leads() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [showLeadDetail, setShowLeadDetail] = useState(false);
   const [showVendorRouting, setShowVendorRouting] = useState(false);
-  const { success, error } = useToast();
+  const { success, error: toastError } = useToast();
 
   useEffect(() => {
     loadLeads();
@@ -40,9 +40,9 @@ export default function Leads() {
       // Ensure we always have an array
       const leadsArray = Array.isArray(data) ? data : (data?.data || []);
       setLeads(leadsArray);
-    } catch (error) {
-      console.error('Failed to load leads:', error);
-      error('Failed to load leads');
+    } catch (err) {
+      console.error('Failed to load leads:', err);
+      toastError('Failed to load leads');
       setLeads([]); // Set empty array on error
     } finally {
       setLoading(false);
@@ -50,12 +50,14 @@ export default function Leads() {
   };
 
   const filteredLeads = (leads || []).filter(lead => {
-    const matchesSearch = 
-      lead.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.phone?.includes(searchTerm);
+    const q = (searchTerm || '').trim().toLowerCase();
+    const matchesSearch = !q ||
+      (lead.name && lead.name.toLowerCase().includes(q)) ||
+      (lead.email && lead.email.toLowerCase().includes(q)) ||
+      (lead.phone && String(lead.phone).toLowerCase().includes(q)) ||
+      JSON.stringify(lead.leadJsonb || lead.lead_jsonb || {}).toLowerCase().includes(q);
     const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    return Boolean(matchesSearch) && Boolean(matchesStatus);
   });
 
   const getStatusVariant = (status) => {
@@ -63,7 +65,8 @@ export default function Leads() {
       case 'new': return 'default';
       case 'contacted': return 'indexing';
       case 'qualified': return 'success';
-      case 'closed': return 'disabled';
+      case 'converted': return 'active';
+      case 'rejected': return 'disabled';
       default: return 'default';
     }
   };
@@ -118,7 +121,7 @@ export default function Leads() {
               <option value="new">New</option>
               <option value="contacted">Contacted</option>
               <option value="qualified">Qualified</option>
-              <option value="closed">Closed</option>
+              <option value="converted">Converted</option><option value="rejected">Rejected</option>
             </select>
           </div>
         </div>
@@ -209,23 +212,23 @@ export default function Leads() {
                         success('Lead status updated');
                         loadLeads(); // Refresh the list
                       } catch (err) {
-                        error('Failed to update lead status');
+                        toastError('Failed to update lead status');
                       }
                     }}
                   >
                     <option value="new">New</option>
                     <option value="contacted">Contacted</option>
                     <option value="qualified">Qualified</option>
-                    <option value="closed">Closed</option>
+                    <option value="converted">Converted</option><option value="rejected">Rejected</option>
                   </select>
                 </div>
               </div>
 
               {/* Lead Details Preview */}
-              {lead.leadJsonb && Object.keys(lead.leadJsonb).length > 0 && (
+              {(lead.leadJsonb || lead.lead_jsonb) && Object.keys(lead.leadJsonb || lead.lead_jsonb).length > 0 && (
                 <div className="mt-3 pt-3 border-t border-gray-200">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
-                    {Object.entries(lead.leadJsonb).slice(0, 6).map(([key, value]) => (
+                    {Object.entries(lead.leadJsonb || lead.lead_jsonb).slice(0, 6).map(([key, value]) => (
                       <div key={key} className="flex items-center space-x-2">
                         <span className="text-gray-500 capitalize">{key}:</span>
                         <span className="text-gray-900 truncate">{String(value)}</span>
@@ -272,12 +275,12 @@ export default function Leads() {
               </div>
             </div>
 
-            {selectedLead.leadJsonb && Object.keys(selectedLead.leadJsonb).length > 0 && (
+            {(selectedLead.leadJsonb || selectedLead.lead_jsonb) && Object.keys(selectedLead.leadJsonb || selectedLead.lead_jsonb).length > 0 && (
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Information</h3>
                 <div className="bg-gray-50 rounded-lg p-4">
                   <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                    {JSON.stringify(selectedLead.leadJsonb, null, 2)}
+                    {JSON.stringify(selectedLead.leadJsonb || selectedLead.lead_jsonb, null, 2)}
                   </pre>
                 </div>
               </div>
@@ -331,3 +334,7 @@ export default function Leads() {
     </div>
   );
 }
+
+
+
+

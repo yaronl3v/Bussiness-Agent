@@ -2,6 +2,7 @@ import Joi from 'joi';
 import ConversationService from '../services/conversation_service.js';
 import { BotOrchestrator } from '../services/bot/bot_orchestrator.js';
 import WhatsAppService from '../services/whatsapp_service.js';
+import { Agent } from '../models/index.js';
 
 const verifySchema = Joi.object({ 'hub.mode': Joi.string(), 'hub.challenge': Joi.string(), 'hub.verify_token': Joi.string() }).unknown(true);
 
@@ -29,7 +30,26 @@ export class WebhooksController {
       if (!agentId) return res.status(400).json({ error: 'agent_id missing' });
 
       const convo = await ConversationService.createOrGet({ agentId, clientId: from, channel: 'whatsapp' });
+
+      // Determine if this is a new conversation (no prior messages)
+      let isNew = false;
+      try {
+        const prior = await ConversationService.getRecentMessages(convo.id, 1);
+        isNew = (Array.isArray(prior) && prior.length === 0);
+      } catch {}
+
+      // Store inbound user message first
       await ConversationService.sendMessage({ conversationId: convo.id, role: 'user', content: text });
+
+      // Send welcome next if this is a new conversation (before LLM)
+      if (isNew) {
+        try {
+          const agent = await Agent.findByPk(agentId);
+          const welcomeText = agent?.dataValues?.welcome_message || 'Hi! I can help with your questions. You can upload documents to improve my answers.';
+          await ConversationService.sendAssistant({ conversationId: convo.id, text: welcomeText, citations: [] });
+          await WhatsAppService.sendText({ to: from, text: welcomeText });
+        } catch {}
+      }
 
       const bot = new BotOrchestrator({ userId: null, agentId });
       const response = await bot.chat({ messageText: text, channel: 'whatsapp', context: { conversationId: convo.id } });

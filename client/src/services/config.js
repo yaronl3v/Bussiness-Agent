@@ -24,7 +24,8 @@ export const API_CONFIG = {
   BASE_URL: getApiBaseUrl(),
   
   // Timeout settings
-  TIMEOUT: 30000, // 30 seconds
+  TIMEOUT: 30000, // 30 seconds (default for most requests)
+  CHAT_TIMEOUT_MS: Number(import.meta.env?.VITE_CHAT_TIMEOUT_MS || 120000), // 120s for long LLM turns
   
   // Request retry settings
   RETRY_ATTEMPTS: 3,
@@ -46,6 +47,14 @@ export const API_CONFIG = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   }
+};
+
+// UI behavior configuration
+export const UI_CONFIG = {
+  // Delay before re-fetching agent after background schema rebuild (ms)
+  SCHEMA_REFRESH_DELAY_MS: Number(import.meta.env?.VITE_SCHEMA_REFRESH_DELAY_MS || 10000),
+  // Number of times to re-fetch agent after save to allow async schema rebuilds
+  SCHEMA_REFRESH_ATTEMPTS: Number(import.meta.env?.VITE_SCHEMA_REFRESH_ATTEMPTS || 3)
 };
 
 // Environment-specific logging

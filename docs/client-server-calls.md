@@ -148,7 +148,7 @@ Conversations & Chat
 - List messages
   - GET `/api/conversations/:id/messages`
 
-- Send message (in‑app chat)
+- Send message (in-app chat)
   - POST `/api/conversations/:id/messages`
   - Body:
 ```json
@@ -159,6 +159,7 @@ Conversations & Chat
 }
 ```
   - Response includes `{ user, assistant, citations }`
+  - On the very first message of a new conversation (when you POST to `/api/conversations/new/messages`), the response also includes a `welcome` assistant message that the server sent prior to invoking the bot: `{ welcome, user, assistant, citations, conversationId }`.
 
 - Start a conversation for an agent (get a conversation id)
   - POST `/api/agents/:id/conversations`
@@ -191,6 +192,7 @@ const first = await (await fetch('/api/conversations/new/messages', {
   body: JSON.stringify({ role:'user', content:'Shalom', agentId })
 })).json();
 const conversationId = first.conversationId;
+// first.welcome contains the server-sent welcome assistant message (if provided)
 
 // next turns reuse the conversation id
 await fetch(`/api/conversations/${conversationId}/messages`, {
