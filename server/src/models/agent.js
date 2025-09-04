@@ -57,11 +57,15 @@ Agent.init(
       type: DataTypes.JSONB,
       allowNull: false,
       defaultValue: {}
-    }
-    ,
+    },
     post_collection_information_text: {
       type: DataTypes.TEXT,
       allowNull: true
+    },
+    chat_flow_jsonb: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: ['DYNAMIC_INFO_SCHEMA_STATE', 'POST_COLLECTION_INFORMATION', 'LEAD_SCHEMA_STATE']
     }
   },
   {
@@ -74,5 +78,3 @@ Agent.init(
 );
 
 export default Agent;
-
-

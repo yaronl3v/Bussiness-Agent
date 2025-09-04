@@ -60,7 +60,8 @@ export async function buildSinglePrompt({
   leadSchema,
   dynSchema,
   passages = [],
-  includeBackHint = true
+  includeBackHint = true,
+  completedSections = []
 }) {
   const agentName = agent?.dataValues?.name || '';
   const businessName = agentName;
@@ -71,6 +72,14 @@ export async function buildSinglePrompt({
   const lang = detectLanguageFromText(
     userMessage || history?.[history.length - 1]?.content_jsonb?.text || ''
   );
+
+  const chatFlow = Array.isArray(agent?.dataValues?.chat_flow_jsonb)
+    ? agent.dataValues.chat_flow_jsonb
+    : ['DYNAMIC_INFO_SCHEMA_STATE', 'POST_COLLECTION_INFORMATION', 'LEAD_SCHEMA_STATE'];
+  const chatFlowOrder = `[${chatFlow.join(', ')}]`;
+  const completedList = Array.isArray(completedSections) && completedSections.length > 0
+    ? `[${completedSections.join(', ')}]`
+    : '[]';
 
   const variables = {
     agentName: agentName,
@@ -85,7 +94,9 @@ export async function buildSinglePrompt({
     chatHistory: formatHistory(history) || '',
     backHint: includeBackHint ? 'Users may type "back" to revisit the previous question or "skip" to skip the current one.' : '',
     currentUserMessage: userMessage || '',
-    allowQuestionsBeforeGathering: allowQuestionsBeforeGathering ? 'true' : 'false'
+    allowQuestionsBeforeGathering: allowQuestionsBeforeGathering ? 'true' : 'false',
+    chatFlowOrder,
+    completedSections: completedList
   };
 
   const promptText = await loadPrompt('single_prompt.txt', variables, lang.locale);
