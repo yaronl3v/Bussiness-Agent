@@ -2,22 +2,21 @@
 import '../env.js';
 
 import { Sequelize } from 'sequelize';
-import { logger } from '../config/logger.js';
 
 // Initialize Sequelize with PostgreSQL
 const databaseUrl = process.env.PG_DATABASE_URL;
 
 if (!databaseUrl) {
-  logger.error('PG_DATABASE_URL environment variable is not set. Please check your .env file.');
+  console.error('PG_DATABASE_URL environment variable is not set. Please check your .env file.');
   process.exit(1);
 }
 
 const sequelize = new Sequelize(databaseUrl, {
   dialect: 'postgres',
   logging: (msg) => {
-    if (process.env.NODE_ENV === 'development') {
-      logger.debug('DB Query', { query: msg });
-    }
+      if (process.env.NODE_ENV === 'development') {
+        console.log('DB Query', { query: msg });
+      }
   },
   pool: {
     max: 10,
@@ -39,10 +38,10 @@ const sequelize = new Sequelize(databaseUrl, {
 export const testConnection = async () => {
   try {
     await sequelize.authenticate();
-    logger.info('Database connection established successfully');
+    console.log('Database connection established successfully');
     return true;
   } catch (error) {
-    logger.error('Unable to connect to database', error);
+    console.error('Unable to connect to database', error);
     return false;
   }
 };
@@ -54,7 +53,7 @@ export const ensureOptionalColumns = async () => {
     await sequelize.query("ALTER TABLE agents ADD COLUMN IF NOT EXISTS dynamic_info_schema_natural_text TEXT;");
     await sequelize.query("ALTER TABLE agents ADD COLUMN IF NOT EXISTS post_collection_information_text TEXT;");
   } catch (error) {
-    logger.warn('Optional schema ensure failed', { error: error?.message });
+    console.warn('Optional schema ensure failed', { error: error?.message });
   }
 };
 
@@ -62,10 +61,10 @@ export const ensureOptionalColumns = async () => {
 export const syncDatabase = async (force = false) => {
   try {
     await sequelize.sync({ force });
-    logger.info(`Database synchronized${force ? ' (forced)' : ''}`);
+    console.log(`Database synchronized${force ? ' (forced)' : ''}`);
     return true;
   } catch (error) {
-    logger.error('Database synchronization failed', error);
+    console.error('Database synchronization failed', error);
     return false;
   }
 };

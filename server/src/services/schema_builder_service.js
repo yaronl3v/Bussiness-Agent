@@ -1,6 +1,5 @@
 import { Agent } from '../models/index.js';
 import LlmService from './llm_service.js';
-import { logger } from '../config/logger.js';
 
 export class SchemaBuilderService {
   static async rebuildLeadSchema(agentId, naturalText) {
@@ -26,11 +25,11 @@ export class SchemaBuilderService {
         const fields = Array.isArray(parsed.fields) ? parsed.fields : (Array.isArray(parsed) ? parsed : null);
         if (fields) {
           await Agent.update({ lead_form_schema_jsonb: fields }, { where: { id: agentId } });
-          logger.info('Lead schema rebuilt', { agentId, duration_s: Number(duration) });
+          console.log('Lead schema rebuilt', { agentId, duration_s: Number(duration) });
         }
       }
     } catch (err) {
-      logger.error('Lead schema rebuild failed', err, { agentId });
+      console.error('Lead schema rebuild failed', err, { agentId });
     }
   }
 
@@ -64,11 +63,11 @@ export class SchemaBuilderService {
         }
         if (schema) {
           await Agent.update({ dynamic_info_schema_jsonb: schema }, { where: { id: agentId } });
-          logger.info('Dynamic schema rebuilt', { agentId, duration_s: Number(duration) });
+          console.log('Dynamic schema rebuilt', { agentId, duration_s: Number(duration) });
         }
       }
     } catch (err) {
-      logger.error('Dynamic schema rebuild failed', err, { agentId });
+      console.error('Dynamic schema rebuild failed', err, { agentId });
     }
   }
 }

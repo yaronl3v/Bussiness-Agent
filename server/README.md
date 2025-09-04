@@ -52,7 +52,6 @@ src/
   ├── index.js            # Main entry point
   ├── config/             # Configuration files
   │   ├── env.js          # Environment variables
-  │   ├── logger.js       # Logging configuration
   │   └── rate_limit.js   # Rate limiting rules
   ├── db/                 # Database configuration
   │   ├── sequelize.js    # Sequelize setup

@@ -5,7 +5,6 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import { logger } from './config/logger.js';
 
 import { errorHandler, notFoundHandler } from './middleware/error_middleware.js';
 import { authenticateToken } from './middleware/auth_middleware.js';

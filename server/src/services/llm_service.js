@@ -1,7 +1,6 @@
 import OpenRouterClient from './open_router/openRouter.js';
 import { logLlmInteraction } from '../utils/llm_debug.js';
 import llmconfig from '../config/llmconfig.js';
-import { logger } from '../config/logger.js';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 
@@ -89,7 +88,7 @@ export class LlmService {
       const text = extractTextFromResponses(resp);
       try {
         const durationSec = (Date.now() - t0) / 1000;
-        logger.info('LLM call complete (Responses)', { model, promptName, duration_s: Number(durationSec.toFixed(3)) });
+        console.log('LLM call complete (Responses)', { model, promptName, duration_s: Number(durationSec.toFixed(3)) });
       } catch {}
 
       try {
@@ -110,7 +109,7 @@ export class LlmService {
     const text = resp.choices?.[0]?.message?.content || '';
     try {
       const durationSec = (Date.now() - t0) / 1000;
-      logger.info('LLM call complete (ChatCompletions)', { model, promptName, duration_s: Number(durationSec.toFixed(3)) });
+      console.log('LLM call complete (ChatCompletions)', { model, promptName, duration_s: Number(durationSec.toFixed(3)) });
     } catch {}
 
     try {
