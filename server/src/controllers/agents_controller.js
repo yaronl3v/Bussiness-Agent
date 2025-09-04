@@ -3,7 +3,6 @@ import { AgentService } from '../services/agent_service.js';
 import IngestionService from '../services/ingestion_service.js';
 import LlmService from '../services/llm_service.js';
 import SchemaBuilderService from '../services/schema_builder_service.js';
-import { logger } from '../config/logger.js';
 
 const isUuid = (s) => typeof s === 'string' && /^[0-9a-fA-F-]{36}$/.test(s);
 
@@ -116,12 +115,12 @@ export class AgentsController {
       const changedDynText = typeof newDynText === 'string' && newDynText !== (currentAgent.dynamic_info_schema_natural_text || '');
             // If the new natural text was cleared, also clear schema immediately
       if (changedLeadText && typeof newLeadText === 'string' && newLeadText.trim().length === 0) {
-        updates.lead_form_schema_jsonb = [];
-        logger.info('Lead schema cleared due to empty natural text', { agentId });
+          updates.lead_form_schema_jsonb = [];
+          console.log('Lead schema cleared due to empty natural text', { agentId });
       }
       if (changedDynText && typeof newDynText === 'string' && newDynText.trim().length === 0) {
-        updates.dynamic_info_schema_jsonb = { sections: [] };
-        logger.info('Dynamic schema cleared due to empty natural text', { agentId });
+          updates.dynamic_info_schema_jsonb = { sections: [] };
+          console.log('Dynamic schema cleared due to empty natural text', { agentId });
       }
 
       const agent = await AgentService.updateForOrg(req.user.id, orgId, agentId, updates);
@@ -133,15 +132,15 @@ export class AgentsController {
       // Fire-and-forget background tasks
       try {
         if (changedLeadText && newLeadText && newLeadText.trim().length > 0) {
-          try { logger.info('Scheduling background lead schema rebuild', { agentId }); } catch {}
-          setImmediate(() => SchemaBuilderService.rebuildLeadSchema(agentId, newLeadText).then(() => logger.info('Background lead schema rebuild complete', { agentId })).catch(e => logger.error('Lead rebuild async error', e, { agentId })));
+            try { console.log('Scheduling background lead schema rebuild', { agentId }); } catch {}
+            setImmediate(() => SchemaBuilderService.rebuildLeadSchema(agentId, newLeadText).then(() => console.log('Background lead schema rebuild complete', { agentId })).catch(e => console.error('Lead rebuild async error', e, { agentId })));
         }
         if (changedDynText && newDynText && newDynText.trim().length > 0) {
-          try { logger.info('Scheduling background dynamic schema rebuild', { agentId }); } catch {}
-          setImmediate(() => SchemaBuilderService.rebuildDynamicSchema(agentId, newDynText).then(() => logger.info('Background dynamic schema rebuild complete', { agentId })).catch(e => logger.error('Dynamic rebuild async error', e, { agentId })));
+            try { console.log('Scheduling background dynamic schema rebuild', { agentId }); } catch {}
+            setImmediate(() => SchemaBuilderService.rebuildDynamicSchema(agentId, newDynText).then(() => console.log('Background dynamic schema rebuild complete', { agentId })).catch(e => console.error('Dynamic rebuild async error', e, { agentId })));
         }
       } catch (e) {
-        logger.warn('Background rebuild scheduling failed', { error: e?.message });
+          console.warn('Background rebuild scheduling failed', { error: e?.message });
       }
       return;
     } catch (err) { next(err); }

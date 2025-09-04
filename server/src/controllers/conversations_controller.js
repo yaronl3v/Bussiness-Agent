@@ -1,7 +1,6 @@
 import Joi from 'joi';
 import ConversationService from '../services/conversation_service.js';
 import { BotOrchestrator } from '../services/bot/bot_orchestrator.js';
-import { logger } from '../config/logger.js';
 import { Agent } from '../models/index.js';
 
 const sendSchema = Joi.object({
@@ -50,7 +49,7 @@ export class ConversationsController {
         createdFresh = true;
       }
       // Log user query content
-      try { logger.info('Conversation user message', { conversationId: id, agentId, userId: req.user.id, role: value.role, query: value.content }); } catch {}
+        try { console.log('Conversation user message', { conversationId: id, agentId, userId: req.user.id, role: value.role, query: value.content }); } catch {}
 
       // Store user message first
       const userMsg = await ConversationService.sendMessage({ conversationId: id, role: value.role, content: value.content });
@@ -69,7 +68,7 @@ export class ConversationsController {
       const response = await bot.chat({ messageText: value.content, channel: 'inapp', context: { conversationId: id } });
       const assistantMsg = await ConversationService.sendAssistant({ conversationId: id, text: response.uiText || '', citations: response.citations || [] });
       const durationSec = (Date.now() - routeStart) / 1000;
-      try { logger.info('Conversation response complete', { conversationId: id, agentId, userId: req.user.id, duration_s: Number(durationSec.toFixed(3)) }); } catch {}
+        try { console.log('Conversation response complete', { conversationId: id, agentId, userId: req.user.id, duration_s: Number(durationSec.toFixed(3)) }); } catch {}
       const payload = { user: userMsg, assistant: assistantMsg, citations: response.citations || [], conversationId: id };
       if (createdFresh && welcomeMsg) payload.welcome = welcomeMsg;
       return res.status(201).json(payload);

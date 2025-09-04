@@ -40,10 +40,9 @@ server/
   src/
     app.js
     server.js
-    config/
-      env.js
-      logger.js
-      rate_limit.js
+      config/
+        env.js
+        rate_limit.js
     db/
       sequelize.js
       migrations/  (Sequelize migrations)

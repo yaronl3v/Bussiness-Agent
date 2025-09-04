@@ -1,8 +1,7 @@
-import { logger } from '../config/logger.js';
 
 // Global error handler
 export const errorHandler = (err, req, res, next) => {
-  logger.error('Unhandled error', err, {
+  console.error('Unhandled error', err, {
     method: req.method,
     url: req.url,
     ip: req.ip
