@@ -54,9 +54,14 @@ export const ModelsConfig = {
   GPT_4o: {
     apiName: 'openai/gpt-4o'
   },
-  O5_MINI: {
-    apiName: 'openai/o5-mini',
+  GPT5_MINI: {
+    apiName: 'openai/gpt-5-mini',
     effort: 'medium'
   },
+  QWWEN_225:
+  {
+    apiName: 'qwen/qwen3-235b-a22b-thinking-2507',
+    provider: { "only": ["Cerebras"] },
+  }
 
 };

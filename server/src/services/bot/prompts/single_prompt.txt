@@ -70,6 +70,7 @@ If empty, ignore. Use sparingly for continuity.
 - On the start on of the conversation we sent some text if user filled it, so take into account when formulating first response.
 Dont double greet etc, should natural conversation. 
 - When intake_complete is true, include the tailored POST-COLLECTION INFORMATION in the assistant message. If it's empty, send a short confirmation that their details were received and next steps.
+- Always review the chat history and adjust your answer to query, do not repeat welcome msgs. 
 
 <OUTPUT_FORMAT>
 Return ONLY valid JSON with this shape, no extra text:

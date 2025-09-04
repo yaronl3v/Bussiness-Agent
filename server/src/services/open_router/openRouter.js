@@ -6,18 +6,17 @@ import axios from 'axios';
 // - responses.create (adapts to chat completions under the hood)
 // - embeddings.create
 
-function mapModelName(model) {
-  if (!model) return model;
-  const m = String(model);
-  // Minimal compatibility mapping for a few common aliases
-  const aliases = new Map([
-    ['gpt-4o-mini', 'openai/o4-mini'],
-    ['o4-mini', 'openai/o4-mini'],
-    ['gpt-4o', 'openai/gpt-4o'],
-    ['gpt-5-mini', 'openai/o5-mini'],
-    ['o5-mini', 'openai/o5-mini']
-  ]);
-  return aliases.get(m) || m;
+function normalizeModel(modelArg) {
+  // Accept either a slug string or an object like { apiName, reasoning?, effort? }
+  if (!modelArg) return { slug: '', reasoning: null, provider: null };
+  if (typeof modelArg === 'string') return { slug: modelArg, reasoning: null, provider: null };
+  if (typeof modelArg === 'object') {
+    const slug = modelArg.apiName || modelArg.model || '';
+    const reasoning = modelArg.reasoning || (modelArg.effort ? { effort: modelArg.effort } : null);
+    const provider = modelArg.provider || null;
+    return { slug, reasoning: reasoning || null, provider };
+  }
+  return { slug: String(modelArg), reasoning: null, provider: null };
 }
 
 function extractTextFromResponsesInput(input) {
@@ -46,6 +45,8 @@ export default class OpenRouterClient {
     this.defaultHeaders = {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
+      ...(process.env.OPENROUTER_SITE_URL ? { 'HTTP-Referer': process.env.OPENROUTER_SITE_URL } : {}),
+      'X-Title': process.env.OPENROUTER_SITE_NAME || 'BusinessAgent',
       ...headers
     };
 
@@ -64,21 +65,41 @@ export default class OpenRouterClient {
   }
 
   async #chatCompletionsCreate({ model, messages, temperature, ...rest }) {
-    const payload = { model: mapModelName(model), messages, ...(typeof temperature === 'number' ? { temperature } : {}), ...rest };
+    // Only forward whitelisted keys accepted by chat completions
+    const allowedKeys = ['max_tokens','top_p','frequency_penalty','presence_penalty','stop','n','stream','user','tools','tool_choice','response_format','logit_bias'];
+    const extra = {};
+    for (const k of allowedKeys) if (k in rest) extra[k] = rest[k];
+    const { slug, reasoning, provider } = normalizeModel(model);
+    const payload = {
+      model: slug,
+      messages,
+      ...(typeof temperature === 'number' ? { temperature } : {}),
+      // set reasoning only if provided by model object
+      ...(reasoning ? { reasoning } : {}),
+      ...(provider ? { provider } : {}),
+      ...extra
+    };
     return this.#post('/chat/completions', payload);
   }
 
-  async #responsesCreate({ model, input, text: _textCfg, reasoning, tools, store: _store, include: _include, temperature, ...rest }) {
+  async #responsesCreate({ model, input, text: _textCfg, reasoning: _reasoning, tools, store: _store, include: _include, temperature, ...rest }) {
     // Adapt Responses-style input to chat.completions
     const combined = extractTextFromResponsesInput(input);
     const messages = [{ role: 'user', content: combined }];
+    // Only forward whitelisted keys; drop Responses-only fields like reasoning/text/store/include
+    const allowedKeys = ['max_tokens','top_p','frequency_penalty','presence_penalty','stop','n','stream','user','tools','tool_choice','response_format','logit_bias'];
+    const extra = {};
+    for (const k of allowedKeys) if (k in rest) extra[k] = rest[k];
+    const { slug, reasoning, provider } = normalizeModel(model);
     const body = {
-      model: mapModelName(model),
+      model: slug,
       messages,
       ...(Array.isArray(tools) && tools.length ? { tools } : {}),
+      // Set reasoning only if provided by model object
       ...(reasoning ? { reasoning } : {}),
+      ...(provider ? { provider } : {}),
       ...(typeof temperature === 'number' ? { temperature } : {}),
-      ...rest
+      ...extra
     };
     const data = await this.#post('/chat/completions', body);
     const content = data?.choices?.[0]?.message?.content || '';
@@ -101,4 +122,3 @@ export default class OpenRouterClient {
     return this.#post('/embeddings', payload);
   }
 }
-

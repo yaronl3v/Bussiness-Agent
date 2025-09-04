@@ -2,10 +2,9 @@
 // Controls history length, retrieval, and default model settings
 
 const llmconfig = {
-  // Default chat model used for LLM calls (OpenRouter slugs supported)
-  // Examples: 'openai/o5-mini', 'openai/gpt-4o', 'x-ai/grok-4'.
-  // Backwards-compat: also accepts 'gpt-5-mini' and 'gpt-4o-mini'.
-  model: process.env.LLM_MODEL || process.env.OPENROUTER_MODEL || process.env.OPENAI_CHAT_MODEL || 'openai/o5-mini',
+  // Select model by key from services/open_router/models.js (e.g., 'GPT5_MINI').
+  // Back-compat: if a provider slug is provided via OPENAI_CHAT_MODEL, it is used as-is.
+  model: process.env.LLM_MODEL_KEY || process.env.OPENROUTER_MODEL_KEY || process.env.OPENAI_CHAT_MODEL || 'QWWEN_225',
 
   // Sampling temperature: higher = more creative, lower = more deterministic
   // Used for Chat Completions; may be ignored by Responses API depending on model
